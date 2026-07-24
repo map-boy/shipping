@@ -1,4 +1,4 @@
-﻿import heroImg from "../assets/hero.png";
+﻿import heroImg from "../assets/hero-photo.jpg";
 
 const categories = [
   "Furniture & General Items", "Boxes", "Cars", "Motorcycles",
@@ -46,3 +46,4 @@ export default function Hero() {
     </section>
   );
 }
+

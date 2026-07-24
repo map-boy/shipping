@@ -1,4 +1,4 @@
-﻿import aboutImg from "../assets/hero.png";
+﻿import aboutImg from "../assets/about-photo.jpg";
 
 export default function About() {
   return (
@@ -29,3 +29,4 @@ export default function About() {
     </section>
   );
 }
+
