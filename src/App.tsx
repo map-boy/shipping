@@ -1,4 +1,7 @@
-﻿import Navbar from "./components/Navbar";
+﻿import { useState, useEffect } from "react";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { auth } from "./firebase";
+import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 import TrustProps from "./components/TrustProps";
 import HowItWorks from "./components/HowItWorks";
@@ -12,11 +15,24 @@ import FAQ from "./components/FAQ";
 import CountrySelector from "./components/CountrySelector";
 import CTABanner from "./components/CTABanner";
 import Footer from "./components/Footer";
+import AuthModal from "./components/AuthModal";
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return unsub;
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
-      <Navbar />
+      <Navbar
+        user={user}
+        onLoginClick={() => setShowAuth(true)}
+        onLogoutClick={() => signOut(auth)}
+      />
       <Hero />
       <TrustProps />
       <HowItWorks />
@@ -30,6 +46,7 @@ export default function App() {
       <CountrySelector />
       <CTABanner />
       <Footer />
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </div>
   );
 }

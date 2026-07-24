@@ -1,4 +1,5 @@
 ﻿import { useState } from "react";
+import type { User } from "firebase/auth";
 
 const services = [
   "Furniture Delivery",
@@ -11,7 +12,13 @@ const services = [
   "Removals",
 ];
 
-export default function Navbar() {
+interface NavbarProps {
+  user: User | null;
+  onLoginClick: () => void;
+  onLogoutClick: () => void;
+}
+
+export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -59,9 +66,26 @@ export default function Navbar() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <button className="hidden sm:inline text-sm text-slate-100 hover:text-cta">
-              Log in
-            </button>
+            {user ? (
+              <>
+                <span className="hidden sm:inline text-sm text-slate-100">
+                  {user.email ?? user.displayName}
+                </span>
+                <button
+                  onClick={onLogoutClick}
+                  className="hidden sm:inline text-sm text-slate-100 hover:text-cta"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={onLoginClick}
+                className="hidden sm:inline text-sm text-slate-100 hover:text-cta"
+              >
+                Log in
+              </button>
+            )}
             <button className="bg-cta hover:bg-ctaHover text-white text-sm font-semibold px-4 py-2 rounded-full transition">
               Get Quotes
             </button>
@@ -80,6 +104,11 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="lg:hidden fixed top-16 left-0 w-full h-screen bg-white shadow-lg z-50 px-4 py-4">
             <ul className="text-gray-700 space-y-3">
+              {user ? (
+                <li><button onClick={onLogoutClick} className="block hover:text-cta">Log out</button></li>
+              ) : (
+                <li><button onClick={onLoginClick} className="block hover:text-cta">Log in</button></li>
+              )}
               <li><a href="#" className="block hover:text-cta">Get Quotes</a></li>
               <li><a href="#" className="block hover:text-cta">Search Deliveries</a></li>
               <li><a href="#" className="block hover:text-cta">How It Works</a></li>
