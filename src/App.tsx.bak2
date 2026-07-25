@@ -5,7 +5,6 @@ import { auth } from "./firebase";
 import Navbar from "./components/Navbar";
 import Home from "./components/Home";
 import RidePage from "./components/RidePage";
-import DriverPage from "./components/DriverPage";
 import Footer from "./components/Footer";
 import AuthModal from "./components/AuthModal";
 
@@ -29,7 +28,6 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/ride" element={<RidePage />} />
-          <Route path="/driver" element={<DriverPage />} />
         </Routes>
         <Footer />
         {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}

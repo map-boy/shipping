@@ -27,3 +27,9 @@ dist-ssr
 .env.local
 
 clone/
+
+functions/.env
+
+functions/lib
+functions/node_modules
+.firebase/

@@ -1,0 +1,125 @@
+﻿import { useEffect, useRef, useState } from "react";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
+import { listenNearbyDrivers, type DriverLocation, type VehicleType } from "../lib/drivers";
+
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
+
+const VEHICLE_OPTIONS: { value: VehicleType | "all"; label: string; color: string }[] = [
+  { value: "all", label: "All", color: "#2563eb" },
+  { value: "standard", label: "Standard", color: "#16a34a" },
+  { value: "truck", label: "Truck", color: "#ca8a04" },
+  { value: "vip", label: "VIP", color: "#7c3aed" },
+];
+
+interface Props {
+  onLocationChange?: (loc: [number, number]) => void;
+}
+
+export default function LiveMap({ onLocationChange }: Props) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const driverMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+
+  const [error, setError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [vehicleFilter, setVehicleFilter] = useState<VehicleType | "all">("all");
+  const [nearbyDrivers, setNearbyDrivers] = useState<DriverLocation[]>([]);
+
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: [30.0619, -1.9441],
+      zoom: 13,
+    });
+
+    if (!navigator.geolocation) {
+      setError("Geolocation not supported by this browser.");
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { longitude, latitude } = pos.coords;
+        setUserLocation([longitude, latitude]);
+        onLocationChange?.([longitude, latitude]);
+
+        if (!userMarkerRef.current) {
+          userMarkerRef.current = new mapboxgl.Marker({ color: "#111827" })
+            .setLngLat([longitude, latitude])
+            .addTo(map.current!);
+          map.current!.setCenter([longitude, latitude]);
+        } else {
+          userMarkerRef.current.setLngLat([longitude, latitude]);
+        }
+      },
+      (err) => setError(err.message),
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
+  useEffect(() => {
+    if (!userLocation) return;
+    const [lng, lat] = userLocation;
+    const unsubscribe = listenNearbyDrivers(lat, lng, 5, vehicleFilter, setNearbyDrivers);
+    return unsubscribe;
+  }, [userLocation, vehicleFilter]);
+
+  useEffect(() => {
+    if (!map.current) return;
+    const currentIds = new Set(nearbyDrivers.map((d) => d.id));
+
+    driverMarkersRef.current.forEach((marker, id) => {
+      if (!currentIds.has(id)) {
+        marker.remove();
+        driverMarkersRef.current.delete(id);
+      }
+    });
+
+    nearbyDrivers.forEach((driver) => {
+      const color = VEHICLE_OPTIONS.find((v) => v.value === driver.vehicleType)?.color || "#2563eb";
+      const existing = driverMarkersRef.current.get(driver.id);
+      if (existing) {
+        existing.setLngLat([driver.lng, driver.lat]);
+      } else {
+        const marker = new mapboxgl.Marker({ color }).setLngLat([driver.lng, driver.lat]).addTo(map.current!);
+        driverMarkersRef.current.set(driver.id, marker);
+      }
+    });
+  }, [nearbyDrivers]);
+
+  return (
+    <div className="w-full">
+      <div className="flex gap-2 mb-3">
+        {VEHICLE_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => setVehicleFilter(opt.value)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${
+              vehicleFilter === opt.value ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300"
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="relative w-full h-[500px] rounded-xl overflow-hidden">
+        <div ref={mapContainer} className="w-full h-full" />
+        {error && (
+          <div className="absolute top-2 left-2 bg-red-100 text-red-700 text-sm px-3 py-1 rounded">{error}</div>
+        )}
+      </div>
+
+      <p className="mt-2 text-sm text-gray-600">
+        {nearbyDrivers.length} {vehicleFilter === "all" ? "vehicle(s)" : vehicleFilter + "(s)"} nearby
+      </p>
+    </div>
+  );
+}
