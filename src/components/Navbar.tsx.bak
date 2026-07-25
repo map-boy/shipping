@@ -1,5 +1,4 @@
 ﻿import { useState } from "react";
-import { Link } from "react-router-dom";
 import type { User } from "firebase/auth";
 
 const services = [
@@ -29,7 +28,7 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
           <ul className="flex gap-4 text-xs text-slate-300">
             <li><a href="/" className="text-white">Personal Use</a></li>
             <li><a href="#" className="hover:text-white">Business Use</a></li>
-            <li><Link to="/driver" className="hover:text-white">Transport Providers</Link></li>
+            <li><a href="#" className="hover:text-white">Transport Providers</a></li>
           </ul>
         </div>
       </div>
@@ -37,7 +36,7 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
       <header className="absolute top-0 left-0 w-full z-30">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16 md:h-20">
           <div className="flex items-center gap-2 font-bold text-xl text-white">
-            <Link to="/">TikTak</Link>
+            <span>TikTak</span>
           </div>
 
           <nav className="hidden lg:flex items-center gap-6 text-sm text-slate-100">
@@ -52,17 +51,16 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
                 <ul className="text-sm py-1">
                   {services.map((s) => (
                     <li key={s}>
-                      <Link to="/ride" className="block px-4 py-1 whitespace-nowrap hover:bg-gray-100 hover:text-cta rounded-lg">
+                      <a href="#" className="block px-4 py-1 whitespace-nowrap hover:bg-gray-100 hover:text-cta rounded-lg">
                         {s}
-                      </Link>
+                      </a>
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
 
-            <Link to="/ride" className="hover:text-cta">Book a Ride</Link>
-            <Link to="/driver" className="hover:text-cta">Drive with TikTak</Link>
+            <a href="#search" className="hover:text-cta">Search Deliveries</a>
             <a href="#how" className="hover:text-cta">How It Works</a>
             <a href="#help" className="hover:text-cta">Help</a>
           </nav>
@@ -88,12 +86,9 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
                 Log in
               </button>
             )}
-            <Link
-              to="/ride"
-              className="bg-cta hover:bg-ctaHover text-white text-sm font-semibold px-4 py-2 rounded-full transition"
-            >
-              Book Now
-            </Link>
+            <button className="bg-cta hover:bg-ctaHover text-white text-sm font-semibold px-4 py-2 rounded-full transition">
+              Get Quotes
+            </button>
             <button
               className="lg:hidden text-white"
               onClick={() => setMobileOpen(!mobileOpen)}
@@ -114,12 +109,12 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
               ) : (
                 <li><button onClick={onLoginClick} className="block hover:text-cta">Log in</button></li>
               )}
-              <li><Link to="/ride" className="block hover:text-cta">Book a Ride</Link></li>
-              <li><Link to="/driver" className="block hover:text-cta">Drive with TikTak</Link></li>
+              <li><a href="#" className="block hover:text-cta">Get Quotes</a></li>
+              <li><a href="#" className="block hover:text-cta">Search Deliveries</a></li>
               <li><a href="#" className="block hover:text-cta">How It Works</a></li>
               <li><a href="#" className="block hover:text-cta">Help</a></li>
               {services.map((s) => (
-                <li key={s}><Link to="/ride" className="block hover:text-cta">{s}</Link></li>
+                <li key={s}><a href="#" className="block hover:text-cta">{s}</a></li>
               ))}
             </ul>
           </div>
@@ -128,3 +123,4 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
     </>
   );
 }
+
