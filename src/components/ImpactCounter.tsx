@@ -27,10 +27,10 @@ export default function ImpactCounter() {
     <section className="relative max-w-7xl mx-auto mt-20 overflow-hidden rounded-tr-[100px] bg-[#08a341]">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 md:py-20 text-center md:text-left">
         <h2 className="text-3xl font-bold text-white mb-6">
-          How YourBrand Helps The Environment
+          How TikTak Helps The Environment
         </h2>
         <p className="text-white">
-          By utilising spare capacity of vehicles running on the road, YourBrand
+          By utilising spare capacity of vehicles running on the road, TikTak
           helps reduce the number of otherwise wasteful journeys needed to transport the item.
         </p>
         <div className="flex flex-col items-center mt-8">
@@ -52,3 +52,4 @@ export default function ImpactCounter() {
     </section>
   );
 }
+

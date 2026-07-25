@@ -14,7 +14,7 @@
             <div className="w-10 h-10 bg-gray-200 rounded-full" />
           </div>
           <p className="text-gray-600 text-sm">
-            YourBrand is an official eBay compatible application
+            TikTak is an official eBay compatible application
           </p>
         </div>
         <div className="md:w-1/3">
@@ -28,3 +28,4 @@
     </section>
   );
 }
+

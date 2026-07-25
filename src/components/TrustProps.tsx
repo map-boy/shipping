@@ -20,7 +20,7 @@ export default function TrustProps() {
   return (
     <section className="max-w-7xl mx-auto px-4 py-16">
       <h2 className="text-center text-2xl font-bold text-gray-900 mb-10">
-        Millions of people use YourBrand
+        Millions of people use TikTak
       </h2>
       <div className="grid md:grid-cols-3 gap-8">
         {items.map((item) => (
@@ -34,3 +34,4 @@ export default function TrustProps() {
     </section>
   );
 }
+

@@ -10,7 +10,7 @@
           </div>
           <div>
             <a href="#" className="inline-flex items-center text-blue-50 bg-blue-500 hover:bg-blue-600 font-semibold px-5 py-2.5 rounded-full transition shadow-sm">
-              Learn More About YourBrand
+              Learn More About TikTak
               <span className="ml-2">-&gt;</span>
             </a>
           </div>
@@ -19,3 +19,4 @@
     </section>
   );
 }
+

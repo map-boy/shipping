@@ -4,7 +4,7 @@
       <div className="max-w-7xl mx-auto px-4">
         <div className="grid grid-cols-2 sm:grid-cols-12 gap-8 py-8 border-t border-slate-700">
           <div className="col-span-2 sm:col-span-12 lg:col-span-2">
-            <div className="text-white font-bold text-xl">YourBrand</div>
+            <div className="text-white font-bold text-xl">TikTak</div>
           </div>
 
           <div className="col-span-1 sm:col-span-6 lg:col-span-2">
@@ -54,9 +54,10 @@
         </div>
 
         <div className="pb-4 text-xs text-slate-500">
-          YourBrand Ltd. &copy; 2026. Replace this with your own company registration details.
+          TikTak Ltd. &copy; 2026. Replace this with your own company registration details.
         </div>
       </div>
     </footer>
   );
 }
+

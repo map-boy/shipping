@@ -78,3 +78,4 @@ export default function PaymentButton({ tripId, amount }: Props) {
     </div>
   );
 }
+

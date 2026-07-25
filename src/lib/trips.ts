@@ -69,3 +69,4 @@ export async function acceptTrip(tripId: string, driverId: string) {
 export async function updateTripStatus(tripId: string, status: TripStatus) {
   await update(ref(db, `trips/${tripId}`), { status });
 }
+

@@ -21,7 +21,7 @@ export default function RecentDeliveries() {
           <div className="md:order-1 md:max-w-md">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Recent Deliveries</h2>
             <p className="text-lg text-slate-500 mb-6">
-              Millions of people use YourBrand to move goods around the globe at a much
+              Millions of people use TikTak to move goods around the globe at a much
               more affordable price - by making use of spare capacity along pre-existing routes.
             </p>
             <ul className="flex flex-col text-slate-600 space-y-3">
@@ -59,3 +59,4 @@ export default function RecentDeliveries() {
     </section>
   );
 }
+

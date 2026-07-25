@@ -173,3 +173,4 @@ export default function LiveMap({ onLocationChange, trackedDriverId }: Props) {
     </div>
   );
 }
+

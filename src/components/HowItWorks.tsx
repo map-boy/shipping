@@ -10,7 +10,7 @@ export default function HowItWorks() {
       <div className="py-12 rounded-tr-[100px] bg-slate-800">
         <div className="flex flex-col xl:flex-row items-center gap-2 px-4">
           <div className="flex flex-col items-center w-full">
-            <h2 className="text-3xl font-bold text-white mb-12">How YourBrand works</h2>
+            <h2 className="text-3xl font-bold text-white mb-12">How TikTak works</h2>
             <div className="lg:pl-[88px] w-full max-w-md">
               {steps.map((step) => (
                 <div key={step.number} className="flex items-center mb-8 last:mb-0">
@@ -33,3 +33,4 @@ export default function HowItWorks() {
     </section>
   );
 }
+

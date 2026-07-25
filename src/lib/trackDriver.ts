@@ -16,3 +16,4 @@ export function listenToDriverLocation(
     onUpdate(val ? { lat: val.lat, lng: val.lng } : null);
   });
 }
+

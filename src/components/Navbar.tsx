@@ -36,7 +36,7 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
       <header className="absolute top-0 left-0 w-full z-30">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16 md:h-20">
           <div className="flex items-center gap-2 font-bold text-xl text-white">
-            <span>YourBrand</span>
+            <span>TikTak</span>
           </div>
 
           <nav className="hidden lg:flex items-center gap-6 text-sm text-slate-100">
@@ -123,3 +123,4 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
     </>
   );
 }
+

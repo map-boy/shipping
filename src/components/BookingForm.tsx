@@ -139,3 +139,4 @@ export default function BookingForm({ userLocation, onTripChange }: Props) {
     </div>
   );
 }
+
