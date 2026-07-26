@@ -1,9 +1,10 @@
-﻿const steps = [
+﻿import { Link } from "react-router-dom";
+
+const steps = [
   { number: "1", text: "Request quotes from our 102,334 rated courier services." },
   { number: "2", text: "Compare prices and read previous customer feedback to pick the right delivery quote for you." },
   { number: "3", text: "Sit back and relax while your item is safely delivered by your chosen transport provider." },
 ];
-
 export default function HowItWorks() {
   return (
     <section id="how" className="max-w-7xl mx-auto px-4 lg:px-0 mt-20">
@@ -22,10 +23,10 @@ export default function HowItWorks() {
               ))}
             </div>
             <div className="my-8">
-              <a href="#" className="inline-flex items-center text-blue-50 bg-blue-500 hover:bg-blue-600 font-semibold px-5 py-2.5 rounded-full transition shadow-sm">
+              <Link to="/ride" className="inline-flex items-center text-blue-50 bg-blue-500 hover:bg-blue-600 font-semibold px-5 py-2.5 rounded-full transition shadow-sm">
                 Get Quotes Now
                 <span className="ml-2">-&gt;</span>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -33,4 +34,3 @@ export default function HowItWorks() {
     </section>
   );
 }
-

@@ -1,4 +1,6 @@
-﻿export default function CTABanner() {
+﻿import { Link } from "react-router-dom";
+
+export default function CTABanner() {
   return (
     <section className="relative bg-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-20">
@@ -9,14 +11,13 @@
             </h2>
           </div>
           <div>
-            <a href="#" className="inline-flex items-center text-blue-50 bg-blue-500 hover:bg-blue-600 font-semibold px-5 py-2.5 rounded-full transition shadow-sm">
-              Learn More About TikTak
+            <Link to="/driver" className="inline-flex items-center text-blue-50 bg-blue-500 hover:bg-blue-600 font-semibold px-5 py-2.5 rounded-full transition shadow-sm">
+              Drive with TikTak
               <span className="ml-2">-&gt;</span>
-            </a>
+            </Link>
           </div>
         </div>
       </div>
     </section>
   );
 }
-

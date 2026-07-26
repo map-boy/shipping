@@ -1,4 +1,6 @@
-﻿const countries = ["Australia", "Canada", "France", "Germany", "India", "Italy", "Brazil", "Mexico", "Spain", "United Kingdom", "USA"];
+﻿import { Link } from "react-router-dom";
+
+const countries = ["Australia", "Canada", "France", "Germany", "India", "Italy", "Brazil", "Mexico", "Spain", "United Kingdom", "USA"];
 
 export default function CountrySelector() {
   return (
@@ -6,16 +8,15 @@ export default function CountrySelector() {
       <ul className="flex flex-wrap justify-center gap-4">
         {countries.map((c) => (
           <li key={c}>
-            <a href="#" className="flex items-center gap-2 group">
+            <Link to="/ride" className="flex items-center gap-2 group">
               <span className="w-4 h-3 bg-gray-300 rounded-sm inline-block" />
               <span className="text-gray-500 group-hover:text-heroTo transition duration-150 ease-in-out">
                 {c}
               </span>
-            </a>
+            </Link>
           </li>
         ))}
       </ul>
     </section>
   );
 }
-

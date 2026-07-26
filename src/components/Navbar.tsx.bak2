@@ -28,7 +28,7 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
         <div className="max-w-7xl mx-auto px-4">
           <ul className="flex gap-4 text-xs text-slate-300">
             <li><a href="/" className="text-white">Personal Use</a></li>
-            <li className="text-slate-500">Business Use (coming soon)</li>
+            <li><a href="#" className="hover:text-white">Business Use</a></li>
             <li><Link to="/driver" className="hover:text-white">Transport Providers</Link></li>
           </ul>
         </div>
@@ -64,6 +64,7 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
             <Link to="/ride" className="hover:text-cta">Book a Ride</Link>
             <Link to="/driver" className="hover:text-cta">Drive with TikTak</Link>
             <a href="#how" className="hover:text-cta">How It Works</a>
+            <a href="#help" className="hover:text-cta">Help</a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -115,7 +116,8 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
               )}
               <li><Link to="/ride" className="block hover:text-cta">Book a Ride</Link></li>
               <li><Link to="/driver" className="block hover:text-cta">Drive with TikTak</Link></li>
-              <li><a href="/#how" className="block hover:text-cta">How It Works</a></li>
+              <li><a href="#" className="block hover:text-cta">How It Works</a></li>
+              <li><a href="#" className="block hover:text-cta">Help</a></li>
               {services.map((s) => (
                 <li key={s}><Link to="/ride" className="block hover:text-cta">{s}</Link></li>
               ))}

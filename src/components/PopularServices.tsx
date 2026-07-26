@@ -1,4 +1,5 @@
-﻿import furnitureImg from "../assets/furniture-service.jpg";
+﻿import { Link } from "react-router-dom";
+import furnitureImg from "../assets/furniture-service.jpg";
 import motorbikeImg from "../assets/motorbike-service.jpg";
 import carImg from "../assets/car-service.jpg";
 import vanImg from "../assets/hero-photo.jpg";
@@ -28,13 +29,13 @@ export default function PopularServices() {
         <div className="flex justify-center">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {services.map((service, i) => (
-              <a key={service.name} href="#" className={`relative bg-gray-200 border border-gray-300 rounded-md overflow-hidden group h-[200px] w-[135px] sm:h-[298px] sm:w-[198px] ${i % 2 === 1 ? "mt-10 sm:mt-20" : ""}`}>
+              <Link key={service.name} to="/ride" className={`relative bg-gray-200 border border-gray-300 rounded-md overflow-hidden group h-[200px] w-[135px] sm:h-[298px] sm:w-[198px] ${i % 2 === 1 ? "mt-10 sm:mt-20" : ""}`}>
                 <img src={service.img} alt={service.name} className="w-full h-full object-cover" />
                 <span className="absolute bottom-0 left-0 z-10 pl-2 pb-1 text-left text-white font-bold text-lg">
                   {service.name}
                 </span>
                 <div className="absolute inset-0 bg-[#1E293B] opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
-              </a>
+              </Link>
             ))}
           </div>
         </div>
@@ -42,4 +43,3 @@ export default function PopularServices() {
     </section>
   );
 }
-

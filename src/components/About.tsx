@@ -2,7 +2,7 @@
 
 export default function About() {
   return (
-    <section className="relative mt-20">
+    <section id="about" className="relative mt-20">
       <div className="max-w-7xl mx-auto bg-gradient-to-b from-slate-100 rounded-tl-[100px] px-4 sm:px-6 pt-12 md:pt-20 pb-12">
         <h2 className="text-2xl font-bold text-gray-900 mb-4 md:mb-8 text-center md:text-left">
           More about TikTak
@@ -29,5 +29,6 @@ export default function About() {
     </section>
   );
 }
+
 
 
