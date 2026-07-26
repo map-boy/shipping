@@ -3,8 +3,6 @@ import { createTripRequest, listenToTrip, type TripRequest, type TripType } from
 import type { VehicleType } from "../lib/drivers";
 import { auth } from "../firebase";
 import PaymentButton from "./PaymentButton";
-import AddressSearch from "./AddressSearch";
-import type { GeocodeResult } from "../lib/geocode";
 
 const VEHICLES: { value: VehicleType; label: string; price: number }[] = [
   { value: "standard", label: "Standard", price: 2000 },
@@ -20,7 +18,8 @@ interface Props {
 export default function BookingForm({ userLocation, onTripChange }: Props) {
   const [tripType, setTripType] = useState<TripType>("person");
   const [vehicleType, setVehicleType] = useState<VehicleType>("standard");
-  const [destination, setDestination] = useState<GeocodeResult | null>(null);
+  const [destLat, setDestLat] = useState("");
+  const [destLng, setDestLng] = useState("");
   const [goodsDescription, setGoodsDescription] = useState("");
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +37,8 @@ export default function BookingForm({ userLocation, onTripChange }: Props) {
       setError("Waiting for your location...");
       return;
     }
-    if (!destination) {
-      setError("Please choose your destination from the suggestions.");
+    if (!destLat || !destLng) {
+      setError("Enter a destination latitude/longitude.");
       return;
     }
     if (!auth.currentUser) {
@@ -53,7 +52,7 @@ export default function BookingForm({ userLocation, onTripChange }: Props) {
       tripType,
       vehicleType,
       { lat, lng },
-      { lat: destination.lat, lng: destination.lng },
+      { lat: parseFloat(destLat), lng: parseFloat(destLng) },
       tripType === "goods" ? goodsDescription : undefined
     );
 
@@ -112,13 +111,22 @@ export default function BookingForm({ userLocation, onTripChange }: Props) {
         />
       )}
 
-      <AddressSearch
-        placeholder="Where are you going? (street, district...)"
-        onSelect={setDestination}
-      />
-      {destination && (
-        <p className="text-sm text-gray-500">Destination: {destination.name}</p>
-      )}
+      <div className="grid grid-cols-2 gap-2">
+        <input
+          type="text"
+          placeholder="Destination latitude"
+          value={destLat}
+          onChange={(e) => setDestLat(e.target.value)}
+          className="border rounded px-3 py-2"
+        />
+        <input
+          type="text"
+          placeholder="Destination longitude"
+          value={destLng}
+          onChange={(e) => setDestLng(e.target.value)}
+          className="border rounded px-3 py-2"
+        />
+      </div>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
@@ -131,3 +139,4 @@ export default function BookingForm({ userLocation, onTripChange }: Props) {
     </div>
   );
 }
+

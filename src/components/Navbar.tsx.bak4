@@ -23,21 +23,11 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const hamburgerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (servicesRef.current && !servicesRef.current.contains(e.target as Node)) {
         setServicesOpen(false);
-      }
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(e.target as Node) &&
-        hamburgerRef.current &&
-        !hamburgerRef.current.contains(e.target as Node)
-      ) {
-        setMobileOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -125,9 +115,8 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
               Book Now
             </Link>
             <button
-              ref={hamburgerRef}
               className="lg:hidden text-white"
-              onClick={() => setMobileOpen((v) => !v)}
+              onClick={() => setMobileOpen(!mobileOpen)}
               aria-label="Toggle menu"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -138,18 +127,18 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
         </div>
 
         {mobileOpen && (
-          <div ref={mobileMenuRef} className="lg:hidden fixed top-16 left-0 w-full h-screen bg-white shadow-lg z-50 px-4 py-4">
+          <div className="lg:hidden fixed top-16 left-0 w-full h-screen bg-white shadow-lg z-50 px-4 py-4">
             <ul className="text-gray-700 space-y-3">
               {user ? (
                 <li><button onClick={onLogoutClick} className="block hover:text-cta">Log out</button></li>
               ) : (
                 <li><button onClick={onLoginClick} className="block hover:text-cta">Log in</button></li>
               )}
-              <li><Link to="/ride" className="block hover:text-cta" onClick={() => setMobileOpen(false)}>Book a Ride</Link></li>
-              <li><Link to="/driver" className="block hover:text-cta" onClick={() => setMobileOpen(false)}>Drive with TikTak</Link></li>
+              <li><Link to="/ride" className="block hover:text-cta">Book a Ride</Link></li>
+              <li><Link to="/driver" className="block hover:text-cta">Drive with TikTak</Link></li>
               <li><a href="/#how" className="block hover:text-cta">How It Works</a></li>
               {services.map((s) => (
-                <li key={s}><Link to="/ride" className="block hover:text-cta" onClick={() => setMobileOpen(false)}>{s}</Link></li>
+                <li key={s}><Link to="/ride" className="block hover:text-cta">{s}</Link></li>
               ))}
             </ul>
           </div>

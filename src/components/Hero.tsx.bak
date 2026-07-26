@@ -1,13 +1,14 @@
-﻿import { Link } from "react-router-dom";
-import heroImg from "../assets/hero-photo.jpg";
+﻿import heroImg from "../assets/hero-photo.jpg";
+
 const categories = [
   "Furniture & General Items", "Boxes", "Cars", "Motorcycles",
   "Other Vehicles", "Moving Home", "Haulage", "Boats",
   "Vehicle Parts", "Pianos", "Pets & Livestock", "Other",
 ];
+
 export default function Hero() {
   return (
-    <section className="relative bg-gradient-to-r from-heroFrom to-heroTo pt-12 pb-16 rounded-bl-[100px]">
+    <section className="relative bg-gradient-to-r from-heroFrom to-heroTo pt-28 pb-16 rounded-bl-[100px]">
       <div className="max-w-7xl mx-auto px-4 grid md:grid-cols-2 gap-10 items-center">
         <div>
           <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight">
@@ -30,12 +31,9 @@ export default function Hero() {
               placeholder="Current Location"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-700 h-[50px]"
             />
-            <Link
-              to="/ride"
-              className="block w-full text-center bg-cta hover:bg-ctaHover text-white font-semibold py-3 rounded-lg transition"
-            >
+            <button className="w-full bg-cta hover:bg-ctaHover text-white font-semibold py-3 rounded-lg transition">
               Receive Quotes In Minutes
-            </Link>
+            </button>
           </div>
           <div className="mt-4 text-sm text-blue-200">
             4.8/5 - 44,468+ reviews
@@ -48,4 +46,5 @@ export default function Hero() {
     </section>
   );
 }
+
 

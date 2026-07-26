@@ -10,7 +10,7 @@ export async function searchPlaces(query: string): Promise<GeocodeResult[]> {
   const token = import.meta.env.VITE_MAPBOX_TOKEN;
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
     query
-  )}.json?access_token=${token}&proximity=30.0619,-1.9441&country=rw&types=address,poi,neighborhood&limit=5`;
+  )}.json?access_token=${token}&proximity=30.0619,-1.9441&limit=5`;
 
   const res = await fetch(url);
   if (!res.ok) return [];
@@ -22,5 +22,3 @@ export async function searchPlaces(query: string): Promise<GeocodeResult[]> {
     lat: f.center[1],
   }));
 }
-
-

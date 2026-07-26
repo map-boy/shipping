@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+﻿import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { User } from "firebase/auth";
 
@@ -21,28 +21,6 @@ interface NavbarProps {
 
 export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [servicesOpen, setServicesOpen] = useState(false);
-  const servicesRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLDivElement>(null);
-  const hamburgerRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (servicesRef.current && !servicesRef.current.contains(e.target as Node)) {
-        setServicesOpen(false);
-      }
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(e.target as Node) &&
-        hamburgerRef.current &&
-        !hamburgerRef.current.contains(e.target as Node)
-      ) {
-        setMobileOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   return (
     <>
@@ -63,33 +41,24 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
           </div>
 
           <nav className="hidden lg:flex items-center gap-6 text-sm text-slate-100">
-            <div className="relative" ref={servicesRef}>
-              <button
-                onClick={() => setServicesOpen((v) => !v)}
-                className="flex items-center gap-1 hover:text-cta"
-              >
+            <div className="relative group">
+              <button className="flex items-center gap-1 hover:text-cta">
                 Services
-                <svg className={`w-2.5 h-2.5 transform transition-transform ${servicesOpen ? "rotate-180" : ""}`} viewBox="0 0 10 6" fill="none">
+                <svg className="w-2.5 h-2.5 transform group-hover:rotate-180 transition-transform" viewBox="0 0 10 6" fill="none">
                   <path d="m1 1 4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
-              {servicesOpen && (
-                <div className="absolute left-0 bg-white rounded-lg shadow-md text-slate-700">
-                  <ul className="text-sm py-1">
-                    {services.map((s) => (
-                      <li key={s}>
-                        <Link
-                          to="/ride"
-                          onClick={() => setServicesOpen(false)}
-                          className="block px-4 py-1 whitespace-nowrap hover:bg-gray-100 hover:text-cta rounded-lg"
-                        >
-                          {s}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <div className="absolute left-0 hidden group-hover:block bg-white rounded-lg shadow-md text-slate-700">
+                <ul className="text-sm py-1">
+                  {services.map((s) => (
+                    <li key={s}>
+                      <Link to="/ride" className="block px-4 py-1 whitespace-nowrap hover:bg-gray-100 hover:text-cta rounded-lg">
+                        {s}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
 
             <Link to="/ride" className="hover:text-cta">Book a Ride</Link>
@@ -125,9 +94,8 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
               Book Now
             </Link>
             <button
-              ref={hamburgerRef}
               className="lg:hidden text-white"
-              onClick={() => setMobileOpen((v) => !v)}
+              onClick={() => setMobileOpen(!mobileOpen)}
               aria-label="Toggle menu"
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -138,18 +106,18 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
         </div>
 
         {mobileOpen && (
-          <div ref={mobileMenuRef} className="lg:hidden fixed top-16 left-0 w-full h-screen bg-white shadow-lg z-50 px-4 py-4">
+          <div className="lg:hidden fixed top-16 left-0 w-full h-screen bg-white shadow-lg z-50 px-4 py-4">
             <ul className="text-gray-700 space-y-3">
               {user ? (
                 <li><button onClick={onLogoutClick} className="block hover:text-cta">Log out</button></li>
               ) : (
                 <li><button onClick={onLoginClick} className="block hover:text-cta">Log in</button></li>
               )}
-              <li><Link to="/ride" className="block hover:text-cta" onClick={() => setMobileOpen(false)}>Book a Ride</Link></li>
-              <li><Link to="/driver" className="block hover:text-cta" onClick={() => setMobileOpen(false)}>Drive with TikTak</Link></li>
+              <li><Link to="/ride" className="block hover:text-cta">Book a Ride</Link></li>
+              <li><Link to="/driver" className="block hover:text-cta">Drive with TikTak</Link></li>
               <li><a href="/#how" className="block hover:text-cta">How It Works</a></li>
               {services.map((s) => (
-                <li key={s}><Link to="/ride" className="block hover:text-cta" onClick={() => setMobileOpen(false)}>{s}</Link></li>
+                <li key={s}><Link to="/ride" className="block hover:text-cta">{s}</Link></li>
               ))}
             </ul>
           </div>
@@ -158,3 +126,5 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
     </>
   );
 }
+
+

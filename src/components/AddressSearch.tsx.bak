@@ -11,7 +11,6 @@ export default function AddressSearch({ placeholder, onSelect }: Props) {
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [open, setOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -30,16 +29,6 @@ export default function AddressSearch({ placeholder, onSelect }: Props) {
     };
   }, [query]);
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
   function handleSelect(place: GeocodeResult) {
     setQuery(place.name);
     setOpen(false);
@@ -47,7 +36,7 @@ export default function AddressSearch({ placeholder, onSelect }: Props) {
   }
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="relative">
       <input
         type="text"
         placeholder={placeholder}
