@@ -1,13 +1,14 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import LiveMap from "./LiveMap";
 import BookingForm from "./BookingForm";
-import { publishDriverLocation } from "../lib/drivers";
+import { publishDriverLocation, type VehicleType } from "../lib/drivers";
 import type { TripRequest } from "../lib/trips";
 
 export default function RidePage() {
   const [seeding, setSeeding] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
+  const [preselectedVehicle, setPreselectedVehicle] = useState<VehicleType | null>(null);
 
   async function seedTestDrivers() {
     setSeeding(true);
@@ -36,9 +37,16 @@ export default function RidePage() {
           </button>
         )}
       </div>
-      <LiveMap onLocationChange={setUserLocation} trackedDriverId={trackedDriverId} />
-      <BookingForm userLocation={userLocation} onTripChange={setActiveTrip} />
+      <LiveMap
+        onLocationChange={setUserLocation}
+        trackedDriverId={trackedDriverId}
+        onRequestVehicle={setPreselectedVehicle}
+      />
+      <BookingForm
+        userLocation={userLocation}
+        onTripChange={setActiveTrip}
+        preselectedVehicle={preselectedVehicle}
+      />
     </div>
   );
 }
-

@@ -1,4 +1,4 @@
-﻿import { ref, onValue, set, onDisconnect, update } from "firebase/database";
+import { ref, onValue, set, onDisconnect, update, query, orderByChild, startAt, endAt } from "firebase/database";
 import { geohashForLocation, geohashQueryBounds, distanceBetween } from "geofire-common";
 import { db } from "../firebase";
 
@@ -64,17 +64,13 @@ export function listenNearbyDrivers(
   };
 
   bounds.forEach((b) => {
-    const q = ref(db, "drivers");
+    const q = query(ref(db, "drivers"), orderByChild("geohash"), startAt(b[0]), endAt(b[1]));
     const unsub = onValue(q, (snapshot) => {
       const data = snapshot.val() || {};
       Object.entries(data).forEach(([id, val]: [string, any]) => {
-        if (val.geohash >= b[0] && val.geohash <= b[1]) {
-          const distanceInKm = distanceBetween([val.lat, val.lng], center);
-          if (distanceInKm <= radiusKm) {
-            driversById.set(id, { id, ...val });
-          } else {
-            driversById.delete(id);
-          }
+        const distanceInKm = distanceBetween([val.lat, val.lng], center);
+        if (distanceInKm <= radiusKm) {
+          driversById.set(id, { id, ...val });
         } else {
           driversById.delete(id);
         }

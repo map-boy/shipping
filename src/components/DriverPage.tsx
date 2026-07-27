@@ -1,7 +1,9 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { publishDriverLocation, goOffline, type VehicleType } from "../lib/drivers";
 import { listenToOpenTrips, acceptTrip, type TripRequest } from "../lib/trips";
 import { auth } from "../firebase";
+import type { User } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 
 const VEHICLES: { value: VehicleType; label: string }[] = [
   { value: "standard", label: "Standard" },
@@ -10,14 +12,27 @@ const VEHICLES: { value: VehicleType; label: string }[] = [
 ];
 
 export default function DriverPage() {
+  const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [authChecked, setAuthChecked] = useState(false);
   const [online, setOnline] = useState(false);
   const [vehicleType, setVehicleType] = useState<VehicleType>("standard");
   const [openTrips, setOpenTrips] = useState<TripRequest[]>([]);
+  const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const driverId = auth.currentUser?.uid || "anonymous-driver";
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthChecked(true);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const driverId = user.uid;
 
     if (!online) {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
@@ -27,6 +42,7 @@ export default function DriverPage() {
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
+        setDriverPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         publishDriverLocation(driverId, pos.coords.latitude, pos.coords.longitude, vehicleType, "online");
       },
       (err) => setError(err.message),
@@ -36,16 +52,38 @@ export default function DriverPage() {
     return () => {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
     };
-  }, [online, vehicleType]);
+  }, [online, vehicleType, user]);
 
   useEffect(() => {
-    const unsub = listenToOpenTrips(vehicleType, setOpenTrips);
+    if (!online || !driverPos) {
+      setOpenTrips([]);
+      return;
+    }
+    const unsub = listenToOpenTrips(driverPos, 15, vehicleType, setOpenTrips);
     return unsub;
-  }, [vehicleType]);
+  }, [vehicleType, online, driverPos]);
 
   async function handleAccept(tripId: string) {
-    const driverId = auth.currentUser?.uid || "anonymous-driver";
-    await acceptTrip(tripId, driverId);
+    if (!user) return;
+    setNotice(null);
+    setError(null);
+    const won = await acceptTrip(tripId, user.uid);
+    if (!won) {
+      setNotice("Too slow — another driver already accepted that trip.");
+    }
+  }
+
+  if (!authChecked) {
+    return <div className="max-w-3xl mx-auto px-4 py-8">Checking your session...</div>;
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-2">Driver dashboard</h1>
+        <p className="text-gray-600">Please log in first to go online and accept trips.</p>
+      </div>
+    );
   }
 
   return (
@@ -72,6 +110,7 @@ export default function DriverPage() {
       </div>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
+      {notice && <p className="text-amber-600 text-sm">{notice}</p>}
 
       <div>
         <h2 className="font-semibold mb-2">Open requests ({vehicleType})</h2>
@@ -81,6 +120,7 @@ export default function DriverPage() {
             <li key={trip.id} className="border rounded p-3 flex justify-between items-center">
               <div>
                 <p className="text-sm font-medium">{trip.tripType === "person" ? "Passenger" : "Goods delivery"}</p>
+                <p className="text-xs text-gray-600">{trip.distanceKm} km &middot; {trip.price} RWF</p>
                 {trip.goodsDescription && <p className="text-xs text-gray-500">{trip.goodsDescription}</p>}
               </div>
               <button
@@ -96,4 +136,3 @@ export default function DriverPage() {
     </div>
   );
 }
-

@@ -1,35 +1,51 @@
-﻿import { useState } from "react";
-import { createTripRequest, listenToTrip, type TripRequest, type TripType } from "../lib/trips";
+import { useState, useMemo, useEffect } from "react";
+import { createTripRequest, listenToTrip, updateTripStatus, type TripRequest, type TripType } from "../lib/trips";
 import type { VehicleType } from "../lib/drivers";
+import { estimateFare } from "../lib/fare";
 import { auth } from "../firebase";
 import PaymentButton from "./PaymentButton";
 import AddressSearch from "./AddressSearch";
 import type { GeocodeResult } from "../lib/geocode";
 
-const VEHICLES: { value: VehicleType; label: string; price: number }[] = [
-  { value: "standard", label: "Standard", price: 2000 },
-  { value: "truck", label: "Truck", price: 5000 },
-  { value: "vip", label: "VIP", price: 8000 },
+const VEHICLES: { value: VehicleType; label: string }[] = [
+  { value: "standard", label: "Standard" },
+  { value: "truck", label: "Truck" },
+  { value: "vip", label: "VIP" },
 ];
 
 interface Props {
   userLocation: [number, number] | null;
   onTripChange?: (trip: TripRequest | null) => void;
+  preselectedVehicle?: VehicleType | null;
 }
 
-export default function BookingForm({ userLocation, onTripChange }: Props) {
+export default function BookingForm({ userLocation, onTripChange, preselectedVehicle }: Props) {
   const [tripType, setTripType] = useState<TripType>("person");
   const [vehicleType, setVehicleType] = useState<VehicleType>("standard");
+
+  useEffect(() => {
+    if (preselectedVehicle) setVehicleType(preselectedVehicle);
+  }, [preselectedVehicle]);
   const [destination, setDestination] = useState<GeocodeResult | null>(null);
   const [goodsDescription, setGoodsDescription] = useState("");
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedVehicle = VEHICLES.find((v) => v.value === vehicleType)!;
+  const estimate = useMemo(() => {
+    if (!userLocation || !destination) return null;
+    const [lng, lat] = userLocation;
+    return estimateFare({ lat, lng }, { lat: destination.lat, lng: destination.lng }, vehicleType);
+  }, [userLocation, destination, vehicleType]);
 
   function updateTrip(trip: TripRequest | null) {
     setActiveTrip(trip);
     onTripChange?.(trip);
+  }
+
+  async function handleCancel() {
+    if (!activeTrip) return;
+    await updateTripStatus(activeTrip.id, "cancelled");
+    updateTrip(null);
   }
 
   async function handleRequest() {
@@ -64,12 +80,23 @@ export default function BookingForm({ userLocation, onTripChange }: Props) {
     return (
       <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
         <p className="font-medium">Trip status: {activeTrip.status}</p>
+        <p className="text-sm text-gray-600">
+          {activeTrip.distanceKm} km  Â· Â {activeTrip.price} RWF
+        </p>
         {activeTrip.driverId && <p className="text-sm text-gray-600">Driver assigned: {activeTrip.driverId}</p>}
         {activeTrip.status === "requested" && (
-          <p className="text-sm text-gray-500">Looking for a nearby driver...</p>
+          <>
+            <p className="text-sm text-gray-500">Looking for a nearby driver...</p>
+            <button
+              onClick={handleCancel}
+              className="w-full bg-gray-200 text-gray-800 rounded py-2 text-sm font-medium"
+            >
+              Cancel request
+            </button>
+          </>
         )}
         {(activeTrip.status === "accepted" || activeTrip.status === "in_progress") && (
-          <PaymentButton tripId={activeTrip.id} amount={selectedVehicle.price} />
+          <PaymentButton tripId={activeTrip.id} amount={activeTrip.price} paymentStatus={activeTrip.paymentStatus} />
         )}
       </div>
     );
@@ -98,7 +125,7 @@ export default function BookingForm({ userLocation, onTripChange }: Props) {
         className="w-full border rounded px-3 py-2"
       >
         {VEHICLES.map((v) => (
-          <option key={v.value} value={v.value}>{v.label} — {v.price} RWF</option>
+          <option key={v.value} value={v.value}>{v.label}</option>
         ))}
       </select>
 
@@ -120,13 +147,22 @@ export default function BookingForm({ userLocation, onTripChange }: Props) {
         <p className="text-sm text-gray-500">Destination: {destination.name}</p>
       )}
 
+      {estimate && (
+        <p className="text-sm font-medium text-gray-700">
+          Estimated: {estimate.distanceKm} km  Â· Â {estimate.price} RWF
+        </p>
+      )}
+
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <button
         onClick={handleRequest}
-        className="w-full bg-blue-600 text-white rounded py-2 font-medium"
+        disabled={!estimate}
+        className="w-full bg-blue-600 text-white rounded py-2 font-medium disabled:opacity-50"
       >
-        Request {tripType === "person" ? "ride" : "delivery"} — {selectedVehicle.price} RWF
+        {estimate
+          ? `Request ${tripType === "person" ? "ride" : "delivery"}  Â· Â ${estimate.price} RWF`
+          : `Choose a destination to see price`}
       </button>
     </div>
   );

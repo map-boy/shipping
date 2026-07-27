@@ -1,16 +1,35 @@
-﻿import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
 
 interface Props {
   tripId: string;
   amount: number;
+  paymentStatus?: string;
 }
 
-export default function PaymentButton({ tripId, amount }: Props) {
+export default function PaymentButton({ tripId, amount, paymentStatus }: Props) {
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [status, setStatus] = useState<"idle" | "requesting" | "pending" | "success" | "failed">("idle");
+  const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  // Stop polling once Firestore/RTDB confirms a terminal state
+  useEffect(() => {
+    if (paymentStatus === "successful" || paymentStatus === "failed") {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      setRequesting(false);
+    }
+  }, [paymentStatus]);
 
   async function handlePay() {
     setError(null);
@@ -18,42 +37,37 @@ export default function PaymentButton({ tripId, amount }: Props) {
       setError("Enter your Mobile Money phone number.");
       return;
     }
-    setStatus("requesting");
+    setRequesting(true);
 
     try {
       const requestMomoPayment = httpsCallable(functions, "requestMomoPayment");
       const result: any = await requestMomoPayment({ phoneNumber, amount, tripId });
       const referenceId = result.data.referenceId;
-      setStatus("pending");
       pollStatus(referenceId);
     } catch (err: any) {
       setError(err.message || "Payment request failed.");
-      setStatus("failed");
+      setRequesting(false);
     }
   }
 
   function pollStatus(referenceId: string) {
     const checkMomoPaymentStatus = httpsCallable(functions, "checkMomoPaymentStatus");
-    const interval = setInterval(async () => {
+    pollRef.current = setInterval(async () => {
       try {
-        const result: any = await checkMomoPaymentStatus({ referenceId, tripId });
-        const current = result.data.status;
-        if (current === "successful") {
-          setStatus("success");
-          clearInterval(interval);
-        } else if (current === "failed") {
-          setStatus("failed");
-          clearInterval(interval);
-        }
+        await checkMomoPaymentStatus({ referenceId, tripId });
+        // paymentStatus prop updates via the live trip listener in the parent;
+        // the effect above stops polling once it reaches a terminal state.
       } catch {
         // keep polling silently on transient errors
       }
     }, 4000);
   }
 
-  if (status === "success") {
+  if (paymentStatus === "successful") {
     return <p className="text-green-600 font-medium">Payment received. Thank you!</p>;
   }
+
+  const isPending = paymentStatus === "pending" || requesting;
 
   return (
     <div className="p-4 border rounded-lg space-y-3">
@@ -64,18 +78,20 @@ export default function PaymentButton({ tripId, amount }: Props) {
         value={phoneNumber}
         onChange={(e) => setPhoneNumber(e.target.value)}
         className="w-full border rounded px-3 py-2"
-        disabled={status === "requesting" || status === "pending"}
+        disabled={isPending}
       />
       {error && <p className="text-red-600 text-sm">{error}</p>}
-      {status === "pending" && <p className="text-sm text-gray-500">Waiting for confirmation on your phone...</p>}
+      {paymentStatus === "failed" && (
+        <p className="text-red-600 text-sm">Payment failed. Please try again.</p>
+      )}
+      {isPending && <p className="text-sm text-gray-500">Waiting for confirmation on your phone...</p>}
       <button
         onClick={handlePay}
-        disabled={status === "requesting" || status === "pending"}
+        disabled={isPending}
         className="w-full bg-blue-600 text-white rounded py-2 font-medium disabled:opacity-50"
       >
-        {status === "requesting" ? "Requesting..." : status === "pending" ? "Waiting..." : "Pay now"}
+        {isPending ? "Waiting..." : "Pay now"}
       </button>
     </div>
   );
 }
-
