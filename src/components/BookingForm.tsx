@@ -58,31 +58,42 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
   }
 
   async function handleRequest() {
+    console.log("[handleRequest] clicked");
     setError(null);
     if (!userLocation) {
+      console.log("[handleRequest] blocked: no userLocation");
       setError("Waiting for your location...");
       return;
     }
     if (!destination) {
+      console.log("[handleRequest] blocked: no destination");
       setError("Please choose your destination from the suggestions.");
       return;
     }
     if (!auth.currentUser) {
+      console.log("[handleRequest] blocked: not logged in");
       setError("Please log in first.");
       return;
     }
 
-    const [lng, lat] = userLocation;
-    const tripId = await createTripRequest(
-      auth.currentUser.uid,
-      tripType,
-      vehicleType,
-      { lat, lng },
-      { lat: destination.lat, lng: destination.lng },
-      tripType === "goods" ? goodsDescription : undefined
-    );
+    console.log("[handleRequest] proceeding, uid:", auth.currentUser.uid);
 
-    listenToTrip(tripId, updateTrip);
+    try {
+      const [lng, lat] = userLocation;
+      const tripId = await createTripRequest(
+        auth.currentUser.uid,
+        tripType,
+        vehicleType,
+        { lat, lng },
+        { lat: destination.lat, lng: destination.lng },
+        tripType === "goods" ? goodsDescription : undefined
+      );
+      console.log("[handleRequest] trip created with id:", tripId);
+      listenToTrip(tripId, updateTrip);
+    } catch (err) {
+      console.error("[handleRequest] createTripRequest FAILED:", err);
+      setError("Failed to create trip: " + (err instanceof Error ? err.message : String(err)));
+    }
   }
 
   if (activeTrip) {
@@ -90,7 +101,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
       <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
         <p className="font-medium">Trip status: {activeTrip.status}</p>
         <p className="text-sm text-gray-600">
-          {activeTrip.distanceKm} km · {activeTrip.price} RWF
+          {activeTrip.distanceKm} km Â· {activeTrip.price} RWF
         </p>
         {activeTrip.driverId && <p className="text-sm text-gray-600">Driver assigned: {activeTrip.driverId}</p>}
         {activeTrip.status === "requested" && (
@@ -188,7 +199,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
         className="w-full bg-blue-600 text-white rounded py-2 font-medium disabled:opacity-50"
       >
         {estimate
-          ? `Request ${tripType === "person" ? "ride" : "delivery"} · ${estimate.price} RWF`
+          ? `Request ${tripType === "person" ? "ride" : "delivery"} Â· ${estimate.price} RWF`
           : `Choose a destination to see price`}
       </button>
     </div>
