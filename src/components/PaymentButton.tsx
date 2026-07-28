@@ -41,7 +41,7 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
 
     try {
       const requestMomoPayment = httpsCallable(functions, "requestMomoPayment");
-      const result: any = await requestMomoPayment({ phoneNumber, amount, tripId });
+      const result: any = await requestMomoPayment({ phoneNumber, tripId });
       const referenceId = result.data.referenceId;
       pollStatus(referenceId);
     } catch (err: any) {

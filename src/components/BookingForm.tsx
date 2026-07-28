@@ -31,6 +31,15 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const rideOptions = useMemo(() => {
+    if (!userLocation || !destination) return null;
+    const [lng, lat] = userLocation;
+    return VEHICLES.map((v) => ({
+      ...v,
+      estimate: estimateFare({ lat, lng }, { lat: destination.lat, lng: destination.lng }, v.value),
+    }));
+  }, [userLocation, destination]);
+
   const estimate = useMemo(() => {
     if (!userLocation || !destination) return null;
     const [lng, lat] = userLocation;
@@ -81,7 +90,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
       <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
         <p className="font-medium">Trip status: {activeTrip.status}</p>
         <p className="text-sm text-gray-600">
-          {activeTrip.distanceKm} km  Â· Â {activeTrip.price} RWF
+          {activeTrip.distanceKm} km · {activeTrip.price} RWF
         </p>
         {activeTrip.driverId && <p className="text-sm text-gray-600">Driver assigned: {activeTrip.driverId}</p>}
         {activeTrip.status === "requested" && (
@@ -119,16 +128,6 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
         </button>
       </div>
 
-      <select
-        value={vehicleType}
-        onChange={(e) => setVehicleType(e.target.value as VehicleType)}
-        className="w-full border rounded px-3 py-2"
-      >
-        {VEHICLES.map((v) => (
-          <option key={v.value} value={v.value}>{v.label}</option>
-        ))}
-      </select>
-
       {tripType === "goods" && (
         <input
           type="text"
@@ -147,10 +146,38 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
         <p className="text-sm text-gray-500">Destination: {destination.name}</p>
       )}
 
-      {estimate && (
-        <p className="text-sm font-medium text-gray-700">
-          Estimated: {estimate.distanceKm} km  Â· Â {estimate.price} RWF
-        </p>
+      {rideOptions ? (
+        <div className="space-y-2">
+          {rideOptions.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setVehicleType(opt.value)}
+              className={`w-full flex items-center justify-between border rounded-lg px-3 py-2 text-left ${
+                vehicleType === opt.value ? "border-blue-600 bg-blue-50" : "border-gray-200"
+              }`}
+            >
+              <span className="flex items-center gap-2"><span><span className="block font-medium">{opt.label}</span>
+                  <span className="block text-xs text-gray-500">{opt.estimate.distanceKm} km</span>
+                </span>
+              </span>
+              <span className="font-medium">{opt.estimate.price} RWF</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {VEHICLES.map((v) => (
+            <button
+              key={v.value}
+              onClick={() => setVehicleType(v.value)}
+              className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-left ${
+                vehicleType === v.value ? "border-blue-600 bg-blue-50" : "border-gray-200"
+              }`}
+            >
+              <span className="font-medium">{v.label}</span>
+            </button>
+          ))}
+        </div>
       )}
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
@@ -161,7 +188,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
         className="w-full bg-blue-600 text-white rounded py-2 font-medium disabled:opacity-50"
       >
         {estimate
-          ? `Request ${tripType === "person" ? "ride" : "delivery"}  Â· Â ${estimate.price} RWF`
+          ? `Request ${tripType === "person" ? "ride" : "delivery"} · ${estimate.price} RWF`
           : `Choose a destination to see price`}
       </button>
     </div>

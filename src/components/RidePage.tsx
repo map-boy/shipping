@@ -24,7 +24,7 @@ export default function RidePage() {
       : null;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-6xl mx-auto px-4 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Find a ride</h1>
         {import.meta.env.DEV && (
@@ -37,16 +37,23 @@ export default function RidePage() {
           </button>
         )}
       </div>
-      <LiveMap
-        onLocationChange={setUserLocation}
-        trackedDriverId={trackedDriverId}
-        onRequestVehicle={setPreselectedVehicle}
-      />
-      <BookingForm
-        userLocation={userLocation}
-        onTripChange={setActiveTrip}
-        preselectedVehicle={preselectedVehicle}
-      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+        <div className="lg:col-span-3">
+          <LiveMap
+            onLocationChange={setUserLocation}
+            trackedDriverId={trackedDriverId}
+            onRequestVehicle={setPreselectedVehicle}
+          />
+        </div>
+        <div className="lg:col-span-2">
+          <BookingForm
+            userLocation={userLocation}
+            onTripChange={setActiveTrip}
+            preselectedVehicle={preselectedVehicle}
+          />
+        </div>
+      </div>
     </div>
   );
 }

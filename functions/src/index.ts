@@ -36,9 +36,26 @@ export const requestMomoPayment = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be logged in.");
   }
-  const { phoneNumber, amount, tripId } = request.data;
-  if (!phoneNumber || !amount || !tripId) {
-    throw new HttpsError("invalid-argument", "phoneNumber, amount, and tripId are required.");
+  const { phoneNumber, tripId } = request.data;
+  if (!phoneNumber || !tripId) {
+    throw new HttpsError("invalid-argument", "phoneNumber and tripId are required.");
+  }
+
+  const tripSnap = await db.ref(`trips/${tripId}`).get();
+  if (!tripSnap.exists()) {
+    throw new HttpsError("not-found", "Trip not found.");
+  }
+  const trip = tripSnap.val();
+
+  if (trip.riderId !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "You do not own this trip.");
+  }
+  if (trip.paymentStatus === "pending" || trip.paymentStatus === "successful") {
+    throw new HttpsError("failed-precondition", "Payment already requested or completed for this trip.");
+  }
+  const amount = trip.price;
+  if (!amount || typeof amount !== "number" || amount <= 0) {
+    throw new HttpsError("failed-precondition", "Trip has no valid price set.");
   }
 
   const referenceId = uuidv4();
