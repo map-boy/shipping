@@ -106,19 +106,28 @@ export function listenToOpenTrips(
 export async function acceptTrip(tripId: string, driverId: string): Promise<boolean> {
   const tripRef = ref(db, `trips/${tripId}`);
 
-  const result = await runTransaction(tripRef, (current) => {
-    if (current === null) {
+  try {
+    const result = await runTransaction(tripRef, (current) => {
+      if (current === null) {
+        console.log("[acceptTrip] node is null, aborting");
+        return current;
+      }
+      console.log("[acceptTrip] current status:", current.status, "driverId:", current.driverId, "trying driverId:", driverId);
+      if (current.status !== "requested") {
+        console.log("[acceptTrip] not requested anymore, aborting");
+        return undefined;
+      }
+      current.status = "accepted";
+      current.driverId = driverId;
       return current;
-    }
-    if (current.status !== "requested") {
-      return undefined;
-    }
-    current.status = "accepted";
-    current.driverId = driverId;
-    return current;
-  });
+    });
 
-  return result.committed;
+    console.log("[acceptTrip] committed:", result.committed, "final value:", result.snapshot.val());
+    return result.committed;
+  } catch (err) {
+    console.error("[acceptTrip] transaction threw:", err);
+    throw err;
+  }
 }
 
 export async function updateTripStatus(tripId: string, status: TripStatus) {
