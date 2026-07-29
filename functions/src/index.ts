@@ -126,3 +126,76 @@ export const checkMomoPaymentStatus = onCall(async (request) => {
 
   return { status };
 });
+const FARE_TABLE: Record<string, { base: number; perKm: number }> = {
+  standard: { base: 500, perKm: 300 },
+  truck: { base: 1500, perKm: 600 },
+  vip: { base: 2500, perKm: 900 },
+};
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(h));
+}
+
+function geohashEncode(lat: number, lng: number, precision = 9): string {
+  const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+  let latMin = -90, latMax = 90, lngMin = -180, lngMax = 180;
+  let hash = "", bit = 0, ch = 0, even = true;
+  while (hash.length < precision) {
+    if (even) {
+      const mid = (lngMin + lngMax) / 2;
+      if (lng > mid) { ch |= (1 << (4 - bit)); lngMin = mid; } else { lngMax = mid; }
+    } else {
+      const mid = (latMin + latMax) / 2;
+      if (lat > mid) { ch |= (1 << (4 - bit)); latMin = mid; } else { latMax = mid; }
+    }
+    even = !even;
+    if (bit < 4) { bit++; } else { hash += BASE32[ch]; bit = 0; ch = 0; }
+  }
+  return hash;
+}
+
+export const createTrip = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+  const { tripType, vehicleType, pickup, destination, goodsDescription } = request.data;
+
+  if (!pickup || !destination || !vehicleType || !tripType) {
+    throw new HttpsError("invalid-argument", "Missing required trip fields.");
+  }
+  if (!FARE_TABLE[vehicleType]) {
+    throw new HttpsError("invalid-argument", "Unknown vehicleType.");
+  }
+
+  const distanceKmRaw = haversineKm(pickup, destination);
+  const { base, perKm } = FARE_TABLE[vehicleType];
+  const price = Math.round(base + distanceKmRaw * perKm);
+  const distanceKm = Math.round(distanceKmRaw * 10) / 10;
+  const pickupGeohash = geohashEncode(pickup.lat, pickup.lng);
+
+  const tripRef = db.ref("trips").push();
+  await tripRef.set({
+    riderId: request.auth.uid,
+    tripType,
+    vehicleType,
+    pickup,
+    destination,
+    pickupGeohash,
+    distanceKm,
+    price,
+    status: "requested",
+    driverId: null,
+    createdAt: Date.now(),
+    ...(goodsDescription ? { goodsDescription } : {}),
+  });
+
+  return { tripId: tripRef.key, distanceKm, price };
+});

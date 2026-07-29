@@ -1,8 +1,8 @@
-import { ref, push, onValue, update, set, runTransaction, query, orderByChild, startAt, endAt } from "firebase/database";
-import { geohashForLocation, geohashQueryBounds, distanceBetween } from "geofire-common";
-import { db } from "../firebase";
+import { ref, onValue, update, runTransaction, query, orderByChild, startAt, endAt } from "firebase/database";
+import { geohashQueryBounds, distanceBetween } from "geofire-common";
+import { db, app } from "../firebase";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import type { VehicleType } from "./drivers";
-import { estimateFare } from "./fare";
 
 export type TripType = "person" | "goods";
 export type TripStatus = "requested" | "accepted" | "in_progress" | "completed" | "cancelled";
@@ -26,34 +26,17 @@ export interface TripRequest {
 }
 
 export async function createTripRequest(
-  riderId: string,
+  _riderId: string,
   tripType: TripType,
   vehicleType: VehicleType,
   pickup: { lat: number; lng: number },
   destination: { lat: number; lng: number },
   goodsDescription?: string
 ) {
-  const { distanceKm, price } = estimateFare(pickup, destination, vehicleType);
-  const pickupGeohash = geohashForLocation([pickup.lat, pickup.lng]);
-
-  const tripsRef = ref(db, "trips");
-  const newTripRef = push(tripsRef);
-  const trip: Omit<TripRequest, "id"> = {
-    riderId,
-    tripType,
-    vehicleType,
-    pickup,
-    destination,
-    pickupGeohash,
-    distanceKm,
-    price,
-    status: "requested",
-    driverId: null,
-    createdAt: Date.now(),
-    ...(goodsDescription ? { goodsDescription } : {}),
-  };
-  await set(newTripRef, trip);
-  return newTripRef.key as string;
+  const functions = getFunctions(app);
+  const createTrip = httpsCallable(functions, "createTrip");
+  const result: any = await createTrip({ tripType, vehicleType, pickup, destination, goodsDescription });
+  return result.data.tripId as string;
 }
 
 export function listenToTrip(tripId: string, onUpdate: (trip: TripRequest | null) => void) {

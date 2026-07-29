@@ -4,22 +4,28 @@
       ".read": "auth != null",
       ".indexOn": ["geohash"],
       "$driverId": {
-        ".write": "auth != null && (auth.uid === $driverId || $driverId.beginsWith('driver'))"
+        ".write": "auth != null && auth.uid === $driverId"
       }
     },
     "trips": {
       ".read": "auth != null",
       ".indexOn": ["pickupGeohash"],
       "$tripId": {
-        ".write": "auth != null && ((!data.exists() && newData.child('riderId').val() === auth.uid && newData.child('status').val() === 'requested' && newData.child('driverId').val() === null) || (data.exists() && data.child('riderId').val() === auth.uid && data.child('status').val() === 'requested' && newData.child('status').val() === 'cancelled') || (data.exists() && data.child('status').val() === 'requested' && newData.child('status').val() === 'accepted' && newData.child('driverId').val() === auth.uid) || (data.exists() && data.child('driverId').val() === auth.uid && data.child('status').val() === 'accepted' && newData.child('status').val() === 'in_progress') || (data.exists() && data.child('driverId').val() === auth.uid && data.child('status').val() === 'in_progress' && newData.child('status').val() === 'completed'))",
+        ".write": "auth != null && ((!data.exists() && newData.child('riderId').val() === auth.uid && newData.child('status').val() === 'requested' && newData.child('driverId').val() === null) || (data.exists() && data.child('riderId').val() === auth.uid && data.child('status').val() === 'requested' && newData.child('status').val() === 'cancelled') || (data.exists() && data.child('status').val() === 'requested' && newData.child('status').val() === 'accepted' && newData.child('driverId').val() === auth.uid && newData.child('riderId').val() === data.child('riderId').val()) || (data.exists() && data.child('driverId').val() === auth.uid && data.child('status').val() === 'accepted' && newData.child('status').val() === 'in_progress') || (data.exists() && data.child('driverId').val() === auth.uid && data.child('status').val() === 'in_progress' && newData.child('status').val() === 'completed'))",
         "riderId": { ".validate": "!data.exists() || newData.val() === data.val()" },
         "tripType": { ".validate": "!data.exists() || newData.val() === data.val()" },
         "vehicleType": { ".validate": "!data.exists() || newData.val() === data.val()" },
-        "pickup": { ".validate": "!data.exists() || newData.val() === data.val()" },
-        "destination": { ".validate": "!data.exists() || newData.val() === data.val()" },
+        "pickup": {
+          "lat": { ".validate": "!data.parent().parent().child('createdAt').exists() || newData.val() === data.val()" },
+          "lng": { ".validate": "!data.parent().parent().child('createdAt').exists() || newData.val() === data.val()" }
+        },
+        "destination": {
+          "lat": { ".validate": "!data.parent().parent().child('createdAt').exists() || newData.val() === data.val()" },
+          "lng": { ".validate": "!data.parent().parent().child('createdAt').exists() || newData.val() === data.val()" }
+        },
         "pickupGeohash": { ".validate": "!data.exists() || newData.val() === data.val()" },
-        "distanceKm": { ".validate": "!data.exists() || newData.val() === data.val()" },
-        "price": { ".validate": "!data.exists() || newData.val() === data.val()" },
+        "distanceKm": { ".validate": "false" },
+        "price": { ".validate": "false" },
         "createdAt": { ".validate": "!data.exists() || newData.val() === data.val()" },
         "goodsDescription": { ".validate": "!data.exists() || newData.val() === data.val()" },
         "paymentStatus": { ".validate": "false" },
