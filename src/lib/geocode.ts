@@ -9,6 +9,21 @@ export interface GeocodeResult {
 const KIGALI_CENTER = { lat: -1.9441, lng: 30.0619 };
 const KIGALI_RADIUS_M = 40000;
 
+export async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const google = await loadGoogleMaps();
+  const geocoder = new google.maps.Geocoder();
+
+  return new Promise((resolve) => {
+    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+      if (status !== google.maps.GeocoderStatus.OK || !results || !results[0]) {
+        resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        return;
+      }
+      resolve(results[0].formatted_address);
+    });
+  });
+}
+
 export async function searchPlaces(query: string): Promise<GeocodeResult[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];

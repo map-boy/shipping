@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { publishDriverLocation, goOffline, type VehicleType } from "../lib/drivers";
+import DriverMap from "./DriverMap";
 import { ref, get } from "firebase/database";
 import { db } from "../firebase";
 import { listenToOpenTrips, listenToTrip, acceptTrip, updateTripStatus, type TripRequest } from "../lib/trips";
@@ -153,6 +154,15 @@ export default function DriverPage() {
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {notice && <p className="text-amber-600 text-sm">{notice}</p>}
+
+      {online && (
+        <DriverMap
+          driverPos={driverPos}
+          openTrips={openTrips}
+          activeTrip={activeTrip}
+          onAccept={handleAccept}
+        />
+      )}
 
       {activeTrip ? (
         <div className="border rounded-lg p-4 space-y-3 bg-blue-50">
