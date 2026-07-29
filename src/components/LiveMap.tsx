@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { listenNearbyDrivers, type DriverLocation, type VehicleType } from "../lib/drivers";
 import { listenToDriverLocation } from "../lib/trackDriver";
+import { fetchRoute } from "../lib/directions";
 
 const VEHICLE_OPTIONS: { value: VehicleType | "all"; label: string; color: string }[] = [
   { value: "all", label: "All", color: "#2563eb" },
@@ -62,6 +63,7 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
   const driverMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const driverInfoWindowsRef = useRef<Map<string, google.maps.InfoWindow>>(new Map());
   const trackedMarkerRef = useRef<google.maps.Marker | null>(null);
+  const routeLineRef = useRef<google.maps.Polyline | null>(null);
   const lastRouteFetchRef = useRef(0);
 
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +193,8 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
     if (!trackedDriverId || !map.current || !google) {
       trackedMarkerRef.current?.setMap(null);
       trackedMarkerRef.current = null;
+      routeLineRef.current?.setMap(null);
+      routeLineRef.current = null;
       setRouteInfo(null);
       return;
     }
@@ -223,9 +227,32 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
         const now = Date.now();
         if (now - lastRouteFetchRef.current > 4000) {
           lastRouteFetchRef.current = now;
-          const [dLng, dLat] = [position.lng - userLocation[0], position.lat - userLocation[1]];
-          const distanceKm = Math.sqrt(dLng * dLng + dLat * dLat) * 111;
-          setRouteInfo({ distanceKm: Math.round(distanceKm * 10) / 10, durationMin: Math.round(distanceKm * 3) });
+          fetchRoute(google, [position.lng, position.lat], [userLocation[0], userLocation[1]])
+            .then((route) => {
+              if (!route || !map.current) return;
+
+              setRouteInfo({ distanceKm: route.distanceKm, durationMin: route.durationMin });
+
+              const path = route.path;
+
+              if (!routeLineRef.current) {
+                routeLineRef.current = new google.maps.Polyline({
+                  path,
+                  map: map.current,
+                  strokeColor: "#2563eb",
+                  strokeOpacity: 0.9,
+                  strokeWeight: 5,
+                });
+              } else {
+                routeLineRef.current.setPath(path);
+              }
+            })
+            .catch(() => {
+              // fall back to straight-line estimate if route fetch fails
+              const [dLng, dLat] = [position.lng - userLocation[0], position.lat - userLocation[1]];
+              const distanceKm = Math.sqrt(dLng * dLng + dLat * dLat) * 111;
+              setRouteInfo({ distanceKm: Math.round(distanceKm * 10) / 10, durationMin: Math.round(distanceKm * 3) });
+            });
         }
       }
     });
@@ -234,6 +261,8 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
       unsubscribe();
       trackedMarkerRef.current?.setMap(null);
       trackedMarkerRef.current = null;
+      routeLineRef.current?.setMap(null);
+      routeLineRef.current = null;
     };
   }, [trackedDriverId, userLocation]);
 

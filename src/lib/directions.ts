@@ -1,30 +1,33 @@
-export interface RouteLineString {
-  type: "LineString";
-  coordinates: [number, number][];
-}
-
 export interface RouteResult {
-  geometry: RouteLineString;
+  path: google.maps.LatLngLiteral[];
   distanceKm: number;
   durationMin: number;
 }
 
 export async function fetchRoute(
+  google: typeof window.google,
   from: [number, number],
   to: [number, number]
 ): Promise<RouteResult | null> {
-  const token = import.meta.env.VITE_MAPBOX_TOKEN;
-  const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${from[0]},${from[1]};${to[0]},${to[1]}?geometries=geojson&overview=full&access_token=${token}`;
+  const service = new google.maps.DirectionsService();
+
   try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    const route = data.routes?.[0];
-    if (!route) return null;
+    const result = await service.route({
+      origin: { lat: from[1], lng: from[0] },
+      destination: { lat: to[1], lng: to[0] },
+      travelMode: google.maps.TravelMode.DRIVING,
+    });
+
+    const route = result.routes[0];
+    const leg = route?.legs[0];
+    if (!route || !leg) return null;
+
+    const path = route.overview_path.map((p) => ({ lat: p.lat(), lng: p.lng() }));
+
     return {
-      geometry: route.geometry,
-      distanceKm: Math.round((route.distance / 1000) * 10) / 10,
-      durationMin: Math.round(route.duration / 60),
+      path,
+      distanceKm: Math.round(((leg.distance?.value ?? 0) / 1000) * 10) / 10,
+      durationMin: Math.round((leg.duration?.value ?? 0) / 60),
     };
   } catch {
     return null;
