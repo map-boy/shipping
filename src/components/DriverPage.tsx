@@ -1,5 +1,7 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { publishDriverLocation, goOffline, type VehicleType } from "../lib/drivers";
+import { ref, get } from "firebase/database";
+import { db } from "../firebase";
 import { listenToOpenTrips, listenToTrip, acceptTrip, updateTripStatus, type TripRequest } from "../lib/trips";
 import { auth } from "../firebase";
 import type { User } from "firebase/auth";
@@ -14,8 +16,9 @@ const VEHICLES: { value: VehicleType; label: string }[] = [
 export default function DriverPage() {
   const [user, setUser] = useState<User | null>(auth.currentUser);
   const [authChecked, setAuthChecked] = useState(false);
-  const [online, setOnline] = useState(false);
-  const [vehicleType, setVehicleType] = useState<VehicleType>("standard");
+  const [online, setOnline] = useState(() => localStorage.getItem("driverOnline") === "true");
+  const [vehicleType, setVehicleType] = useState<VehicleType>(() => (localStorage.getItem("driverVehicleType") as VehicleType) || "standard");
+  const [resuming, setResuming] = useState(true);
   const [openTrips, setOpenTrips] = useState<TripRequest[]>([]);
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
@@ -30,6 +33,24 @@ export default function DriverPage() {
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    get(ref(db, `drivers/${user.uid}/status`)).then((snap) => {
+      const dbOnline = snap.exists() && snap.val() === "online";
+      setOnline(dbOnline);
+      localStorage.setItem("driverOnline", String(dbOnline));
+      setResuming(false);
+    }).catch(() => setResuming(false));
+  }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem("driverOnline", String(online));
+  }, [online]);
+
+  useEffect(() => {
+    localStorage.setItem("driverVehicleType", vehicleType);
+  }, [vehicleType]);
 
   useEffect(() => {
     if (!user) return;
@@ -123,7 +144,7 @@ export default function DriverPage() {
 
         <button
           onClick={() => setOnline((v) => !v)}
-          disabled={!!activeTrip}
+          disabled={!!activeTrip || resuming}
           className={`px-4 py-2 rounded font-medium ${online ? "bg-green-600 text-white" : "bg-gray-200"}`}
         >
           {online ? "Online" : "Go online"}
