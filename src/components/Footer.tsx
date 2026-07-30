@@ -1,4 +1,4 @@
-﻿import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 export default function Footer() {
   return (
@@ -30,26 +30,11 @@ export default function Footer() {
             <p className="text-sm text-slate-100 font-bold mb-3">Company</p>
             <ul className="text-sm space-y-2">
               <li><a href="/#about" className="text-slate-400 hover:text-blue-500 transition">About</a></li>
-              <li className="text-slate-500">Blog (coming soon)</li>
-              <li className="text-slate-500">Cookie Policy</li>
             </ul>
-          </div>
-          <div className="col-span-1 sm:col-span-6 lg:col-span-2">
-            <p className="text-sm text-slate-100 font-bold mb-3">&nbsp;</p>
-            <ul className="text-sm space-y-2">
-              <li className="text-slate-500">Terms</li>
-              <li className="text-slate-500">Sitemap</li>
-              <li className="text-slate-500">Privacy Policy</li>
-            </ul>
-          </div>
-          <div className="col-span-2 sm:col-span-12 flex justify-center sm:justify-start gap-4 mt-4 sm:mt-0 text-slate-500">
-            <span aria-label="X">X</span>
-            <span aria-label="Facebook">FB</span>
-            <span aria-label="Instagram">IG</span>
           </div>
         </div>
         <div className="pb-4 text-xs text-slate-500">
-          TikTak Ltd. &copy; 2026. Replace this with your own company registration details.
+          TikTak Ltd. &copy; 2026.
         </div>
       </div>
     </footer>
