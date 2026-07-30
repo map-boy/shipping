@@ -9,9 +9,10 @@ interface Props {
   openTrips: TripRequest[];
   activeTrip: TripRequest | null;
   onAccept: (tripId: string) => void;
+  fullScreen?: boolean;
 }
 
-export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept }: Props) {
+export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept, fullScreen }: Props) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const googleRef = useRef<typeof google | null>(null);
@@ -183,7 +184,7 @@ export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept }
   }, [ready, activeTrip, driverPos]);
 
   return (
-    <div className="relative w-full h-[320px] rounded-xl overflow-hidden">
+    <div className={fullScreen ? "relative w-full h-full" : "relative w-full h-[320px] rounded-xl overflow-hidden"}>
       <div ref={mapContainer} className="w-full h-full" />
       {activeTrip && (
         <div className="absolute top-2 left-2 bg-white shadow px-3 py-1.5 rounded-lg text-sm font-medium">

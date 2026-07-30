@@ -128,15 +128,27 @@ export default function DriverPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-2xl font-bold">Driver dashboard</h1>
+    <div className="relative w-full h-[calc(100vh-96px)] md:h-[calc(100vh-108px)]">
+      {online ? (
+        <DriverMap
+          driverPos={driverPos}
+          openTrips={openTrips}
+          activeTrip={activeTrip}
+          onAccept={handleAccept}
+          fullScreen
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500 text-sm px-6 text-center">
+          Go online to see the map and start receiving requests.
+        </div>
+      )}
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <div className="absolute top-3 left-3 right-3 z-20 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
         <select
           value={vehicleType}
           onChange={(e) => setVehicleType(e.target.value as VehicleType)}
           disabled={!!activeTrip}
-          className="border rounded-lg px-3 py-3 text-base"
+          className="border rounded-lg px-3 py-3 text-base bg-white shadow"
         >
           {VEHICLES.map((v) => (
             <option key={v.value} value={v.value}>{v.label}</option>
@@ -146,80 +158,49 @@ export default function DriverPage() {
         <button
           onClick={() => setOnline((v) => !v)}
           disabled={!!activeTrip || resuming}
-          className={`px-4 py-3 rounded-lg font-semibold text-base ${online ? "bg-green-600 text-white" : "bg-gray-200"}`}
+          className={`px-4 py-3 rounded-lg font-semibold text-base shadow ${online ? "bg-green-600 text-white" : "bg-white text-gray-800"}`}
         >
           {online ? "Online" : "Go online"}
         </button>
       </div>
 
-      {error && <p className="text-red-600 text-sm">{error}</p>}
-      {notice && <p className="text-amber-600 text-sm">{notice}</p>}
-
-      {online && (
-        <DriverMap
-          driverPos={driverPos}
-          openTrips={openTrips}
-          activeTrip={activeTrip}
-          onAccept={handleAccept}
-        />
+      {error && (
+        <div className="absolute top-20 left-3 right-3 z-20 bg-red-100 text-red-700 text-sm px-3 py-2 rounded-lg shadow">{error}</div>
+      )}
+      {notice && (
+        <div className="absolute top-20 left-3 right-3 z-20 bg-amber-100 text-amber-700 text-sm px-3 py-2 rounded-lg shadow">{notice}</div>
       )}
 
-      {activeTrip ? (
-        <div className="border rounded-lg p-4 space-y-3 bg-blue-50">
-          <h2 className="font-semibold">Active trip</h2>
-          <p className="text-sm font-medium">
-            {activeTrip.tripType === "person" ? "Passenger" : "Goods delivery"}
-          </p>
-          <p className="text-sm text-gray-600">{activeTrip.distanceKm} km &middot; {activeTrip.price} RWF</p>
-          {activeTrip.goodsDescription && (
-            <p className="text-sm text-gray-500">{activeTrip.goodsDescription}</p>
-          )}
-          <p className="text-xs text-gray-500">
-            Pickup: {activeTrip.pickup.lat.toFixed(4)}, {activeTrip.pickup.lng.toFixed(4)}
-          </p>
-          <p className="text-xs text-gray-500">
-            Destination: {activeTrip.destination.lat.toFixed(4)}, {activeTrip.destination.lng.toFixed(4)}
-          </p>
-          <p className="text-sm font-medium">Status: {activeTrip.status}</p>
+      {activeTrip && (
+        <div className="absolute left-0 right-0 bottom-0 z-20">
+          <div className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] px-4 pt-4 pb-6 space-y-3">
+            <h2 className="font-semibold">Active trip</h2>
+            <p className="text-sm font-medium">
+              {activeTrip.tripType === "person" ? "Passenger" : "Goods delivery"}
+            </p>
+            <p className="text-sm text-gray-600">{activeTrip.distanceKm} km &middot; {activeTrip.price} RWF</p>
+            {activeTrip.goodsDescription && (
+              <p className="text-sm text-gray-500">{activeTrip.goodsDescription}</p>
+            )}
+            <p className="text-sm font-medium">Status: {activeTrip.status}</p>
 
-          {activeTrip.status === "accepted" && (
-            <button
-              onClick={handleStartTrip}
-              className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700"
-            >
-              Start trip
-            </button>
-          )}
-          {activeTrip.status === "in_progress" && (
-            <button
-              onClick={handleCompleteTrip}
-              className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-green-700"
-            >
-              Complete trip
-            </button>
-          )}
-        </div>
-      ) : (
-        <div>
-          <h2 className="font-semibold mb-2">Open requests ({vehicleType})</h2>
-          {openTrips.length === 0 && <p className="text-sm text-gray-500">No requests right now.</p>}
-          <ul className="space-y-2">
-            {openTrips.map((trip) => (
-              <li key={trip.id} className="border rounded p-3 flex justify-between items-center">
-                <div>
-                  <p className="text-sm font-medium">{trip.tripType === "person" ? "Passenger" : "Goods delivery"}</p>
-                  <p className="text-xs text-gray-600">{trip.distanceKm} km &middot; {trip.price} RWF</p>
-                  {trip.goodsDescription && <p className="text-xs text-gray-500">{trip.goodsDescription}</p>}
-                </div>
-                <button
-                  onClick={() => handleAccept(trip.id)}
-                  className="bg-blue-600 text-white text-sm px-3 py-1 rounded"
-                >
-                  Accept
-                </button>
-              </li>
-            ))}
-          </ul>
+            {activeTrip.status === "accepted" && (
+              <button
+                onClick={handleStartTrip}
+                className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700"
+              >
+                Start trip
+              </button>
+            )}
+            {activeTrip.status === "in_progress" && (
+              <button
+                onClick={handleCompleteTrip}
+                className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-green-700"
+              >
+                Complete trip
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
