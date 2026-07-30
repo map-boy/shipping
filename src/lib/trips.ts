@@ -116,3 +116,15 @@ export async function acceptTrip(tripId: string, driverId: string): Promise<bool
 export async function updateTripStatus(tripId: string, status: TripStatus) {
   await update(ref(db, `trips/${tripId}`), { status });
 }
+
+export async function markCashPayment(tripId: string) {
+  const functions = getFunctions(app);
+  const fn = httpsCallable(functions, "markCashPayment");
+  await fn({ tripId });
+}
+
+export async function completeTrip(tripId: string) {
+  const functions = getFunctions(app);
+  const fn = httpsCallable(functions, "completeTrip");
+  await fn({ tripId });
+}

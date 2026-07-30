@@ -126,6 +126,136 @@ export const checkMomoPaymentStatus = onCall(async (request) => {
 
   return { status };
 });
+export const markCashPayment = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+  const { tripId } = request.data;
+  if (!tripId) {
+    throw new HttpsError("invalid-argument", "tripId is required.");
+  }
+
+  const tripSnap = await db.ref(`trips/${tripId}`).get();
+  if (!tripSnap.exists()) {
+    throw new HttpsError("not-found", "Trip not found.");
+  }
+  const trip = tripSnap.val();
+
+  if (trip.driverId !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "Only the assigned driver can do this.");
+  }
+  if (trip.status !== "in_progress") {
+    throw new HttpsError("failed-precondition", "Trip must be in progress to mark cash payment.");
+  }
+  if (trip.paymentStatus === "successful") {
+    throw new HttpsError("failed-precondition", "This trip was already paid via Mobile Money.");
+  }
+
+  await db.ref(`trips/${tripId}/paymentStatus`).set("cash");
+  return { ok: true };
+});
+
+export const completeTrip = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be logged in.");
+  }
+  const { tripId } = request.data;
+  if (!tripId) {
+    throw new HttpsError("invalid-argument", "tripId is required.");
+  }
+
+  const tripSnap = await db.ref(`trips/${tripId}`).get();
+  if (!tripSnap.exists()) {
+    throw new HttpsError("not-found", "Trip not found.");
+  }
+  const trip = tripSnap.val();
+
+  if (trip.driverId !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "Only the assigned driver can complete this trip.");
+  }
+  if (trip.status !== "in_progress") {
+    throw new HttpsError("failed-precondition", "Trip must be in progress to complete.");
+  }
+  if (trip.paymentStatus !== "successful" && trip.paymentStatus !== "cash") {
+    throw new HttpsError("failed-precondition", "Payment must be completed before finishing the trip.");
+  }
+
+  await db.ref(`trips/${tripId}`).remove();
+  return { ok: true };
+});
+function checkAdminCreds(username: any, password: any) {
+  if (
+    username !== process.env.ADMIN_USERNAME ||
+    password !== process.env.ADMIN_PASSWORD
+  ) {
+    throw new HttpsError("permission-denied", "Invalid admin credentials.");
+  }
+}
+
+export const adminLogin = onCall(async (request) => {
+  const { username, password } = request.data;
+  checkAdminCreds(username, password);
+  return { ok: true };
+});
+
+export const adminListTrips = onCall(async (request) => {
+  const { username, password } = request.data;
+  checkAdminCreds(username, password);
+  const snap = await db.ref("trips").get();
+  const val = snap.val() || {};
+  const trips = Object.entries(val).map(([id, t]: [string, any]) => ({ id, ...t }));
+  return { trips };
+});
+
+export const adminListDrivers = onCall(async (request) => {
+  const { username, password } = request.data;
+  checkAdminCreds(username, password);
+  const snap = await db.ref("drivers").get();
+  const val = snap.val() || {};
+  const drivers = Object.entries(val).map(([id, d]: [string, any]) => ({ id, ...d }));
+  return { drivers };
+});
+
+export const adminListBans = onCall(async (request) => {
+  const { username, password } = request.data;
+  checkAdminCreds(username, password);
+  const snap = await db.ref("bannedUsers").get();
+  return { bans: snap.val() || {} };
+});
+
+export const adminDeleteTrip = onCall(async (request) => {
+  const { username, password, tripId } = request.data;
+  checkAdminCreds(username, password);
+  if (!tripId) {
+    throw new HttpsError("invalid-argument", "tripId is required.");
+  }
+  await db.ref(`trips/${tripId}`).remove();
+  return { ok: true };
+});
+
+export const adminSetUserBan = onCall(async (request) => {
+  const { username, password, userId, banned, reason } = request.data;
+  checkAdminCreds(username, password);
+  if (!userId) {
+    throw new HttpsError("invalid-argument", "userId is required.");
+  }
+  if (banned) {
+    await db.ref(`bannedUsers/${userId}`).set({ bannedAt: Date.now(), reason: reason || "" });
+  } else {
+    await db.ref(`bannedUsers/${userId}`).remove();
+  }
+  return { ok: true };
+});
+
+export const adminSetDriverStatus = onCall(async (request) => {
+  const { username, password, driverId, status } = request.data;
+  checkAdminCreds(username, password);
+  if (!driverId || !status) {
+    throw new HttpsError("invalid-argument", "driverId and status are required.");
+  }
+  await db.ref(`drivers/${driverId}/status`).set(status);
+  return { ok: true };
+});
 const FARE_TABLE: Record<string, { base: number; perKm: number }> = {
   standard: { base: 500, perKm: 300 },
   truck: { base: 1500, perKm: 600 },
@@ -167,6 +297,11 @@ export const createTrip = onCall(async (request) => {
     throw new HttpsError("unauthenticated", "You must be logged in.");
   }
   const { tripType, vehicleType, pickup, destination, goodsDescription } = request.data;
+
+  const bannedSnap = await db.ref(`bannedUsers/${request.auth.uid}`).get();
+  if (bannedSnap.exists()) {
+    throw new HttpsError("permission-denied", "Your account has been suspended.");
+  }
 
   if (!pickup || !destination || !vehicleType || !tripType) {
     throw new HttpsError("invalid-argument", "Missing required trip fields.");

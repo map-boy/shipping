@@ -3,7 +3,7 @@ import { publishDriverLocation, goOffline, type VehicleType } from "../lib/drive
 import DriverMap from "./DriverMap";
 import { ref, get } from "firebase/database";
 import { db } from "../firebase";
-import { listenToOpenTrips, listenToTrip, acceptTrip, updateTripStatus, type TripRequest } from "../lib/trips";
+import { listenToOpenTrips, listenToTrip, acceptTrip, updateTripStatus, markCashPayment, completeTrip, type TripRequest } from "../lib/trips";
 import { auth } from "../firebase";
 import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
@@ -147,9 +147,6 @@ export default function DriverPage() {
     }
     listenToTrip(tripId, (trip) => {
       setActiveTrip(trip);
-      if (trip && trip.status === "completed") {
-        setActiveTrip(null);
-      }
     });
   }
 
@@ -158,10 +155,26 @@ export default function DriverPage() {
     await updateTripStatus(activeTrip.id, "in_progress");
   }
 
+  async function handleMarkCash() {
+    if (!activeTrip) return;
+    setError(null);
+    try {
+      await markCashPayment(activeTrip.id);
+    } catch (err: any) {
+      setError(err.message || "Could not mark as paid in cash.");
+    }
+  }
+
   async function handleCompleteTrip() {
     if (!activeTrip) return;
-    await updateTripStatus(activeTrip.id, "completed");
-    setActiveTrip(null);
+    setError(null);
+    try {
+      await completeTrip(activeTrip.id);
+      setNotice("Trip completed! Payment confirmed.");
+      setActiveTrip(null);
+    } catch (err: any) {
+      setError(err.message || "Could not complete trip. Make sure payment is done first.");
+    }
   }
 
   if (!authChecked) {
@@ -272,12 +285,33 @@ export default function DriverPage() {
               </button>
             )}
             {activeTrip.status === "in_progress" && (
-              <button
-                onClick={handleCompleteTrip}
-                className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-green-700"
-              >
-                Complete trip
-              </button>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  Payment:{" "}
+                  {activeTrip.paymentStatus === "successful"
+                    ? "Paid via Mobile Money"
+                    : activeTrip.paymentStatus === "cash"
+                    ? "Marked paid in cash"
+                    : activeTrip.paymentStatus === "pending"
+                    ? "Waiting for Mobile Money confirmation..."
+                    : "Not paid yet"}
+                </p>
+                {activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash" && (
+                  <button
+                    onClick={handleMarkCash}
+                    className="w-full bg-amber-500 text-white rounded-lg py-3.5 text-base font-semibold active:bg-amber-600"
+                  >
+                    Mark as paid in cash (system down)
+                  </button>
+                )}
+                <button
+                  onClick={handleCompleteTrip}
+                  disabled={activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash"}
+                  className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-green-700"
+                >
+                  Complete trip
+                </button>
+              </div>
             )}
           </div>
         </div>

@@ -41,7 +41,13 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
     return estimateFare({ lat, lng }, { lat: destination.lat, lng: destination.lng }, vehicleType);
   }, [userLocation, destination, vehicleType]);
 
+  const [justCompleted, setJustCompleted] = useState(false);
+
   function updateTrip(trip: TripRequest | null) {
+    if (!trip && activeTrip && (activeTrip.status === "accepted" || activeTrip.status === "in_progress")) {
+      setJustCompleted(true);
+      setTimeout(() => setJustCompleted(false), 6000);
+    }
     setActiveTrip(trip);
     onTripChange?.(trip);
   }
@@ -81,6 +87,16 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
     } catch (err) {
       setError("Failed to create trip: " + (err instanceof Error ? err.message : String(err)));
     }
+  }
+
+  if (justCompleted) {
+    return (
+      <div className="space-y-3 text-center py-4">
+        <div className="text-4xl">&#9989;</div>
+        <p className="text-lg font-bold text-green-700">Trip completed!</p>
+        <p className="text-sm text-gray-500">Thank you for riding with us.</p>
+      </div>
+    );
   }
 
   if (activeTrip) {

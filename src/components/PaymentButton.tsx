@@ -31,7 +31,15 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
     }
   }, [paymentStatus]);
 
-  async function handlePay() {
+  function normalizePhone(raw: string): string {
+  const digits = raw.replace(/[^0-9]/g, "");
+  if (digits.startsWith("250")) return digits;
+  if (digits.startsWith("0")) return "250" + digits.slice(1);
+  if (digits.startsWith("7")) return "250" + digits;
+  return digits;
+}
+
+async function handlePay() {
     setError(null);
     if (!phoneNumber) {
       setError("Enter your Mobile Money phone number.");
@@ -41,7 +49,7 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
 
     try {
       const requestMomoPayment = httpsCallable(functions, "requestMomoPayment");
-      const result: any = await requestMomoPayment({ phoneNumber, tripId });
+      const result: any = await requestMomoPayment({ phoneNumber: normalizePhone(phoneNumber), tripId });
       const referenceId = result.data.referenceId;
       pollStatus(referenceId);
     } catch (err: any) {
@@ -74,7 +82,7 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
       <p className="font-medium">Pay {amount} via Mobile Money</p>
       <input
         type="tel"
-        placeholder="e.g. 25078XXXXXXX"
+        placeholder="e.g. 078XXXXXXX or 25078XXXXXXX"
         value={phoneNumber}
         onChange={(e) => setPhoneNumber(e.target.value)}
         className="w-full border rounded-lg px-3 py-3 text-base"
