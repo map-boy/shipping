@@ -84,18 +84,35 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
   }
 
   if (activeTrip) {
+    const statusBoxClass =
+      activeTrip.status === "accepted"
+        ? "bg-green-50 text-green-700"
+        : activeTrip.status === "in_progress"
+        ? "bg-blue-50 text-blue-700"
+        : "bg-amber-50 text-amber-700";
+
+    const statusText =
+      activeTrip.status === "requested"
+        ? "Looking for a nearby driver..."
+        : activeTrip.status === "accepted"
+        ? "Driver accepted! On the way to you."
+        : activeTrip.status === "in_progress"
+        ? "Trip in progress"
+        : activeTrip.status;
+
     return (
       <div className="space-y-3">
-        <p className="font-medium">Trip status: {activeTrip.status}</p>
-        <p className="text-sm text-gray-600">{activeTrip.distanceKm} km &middot; {activeTrip.price} RWF</p>
-        {activeTrip.driverId && <p className="text-sm text-gray-600">Driver assigned: {activeTrip.driverId}</p>}
+        <div className={`rounded-lg px-4 py-3 text-center font-bold text-base ${statusBoxClass}`}>
+          {statusText}
+        </div>
+        <p className="text-sm text-gray-600 text-center">{activeTrip.distanceKm} km &middot; {activeTrip.price} RWF</p>
+        {activeTrip.driverId && (activeTrip.status === "accepted" || activeTrip.status === "in_progress") && (
+          <p className="text-sm text-gray-500 text-center">Your driver's location is shown live on the map above.</p>
+        )}
         {activeTrip.status === "requested" && (
-          <>
-            <p className="text-sm text-gray-500">Looking for a nearby driver...</p>
-            <button onClick={handleCancel} className="w-full bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300">
-              Cancel request
-            </button>
-          </>
+          <button onClick={handleCancel} className="w-full bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300">
+            Cancel request
+          </button>
         )}
         {(activeTrip.status === "accepted" || activeTrip.status === "in_progress") && (
           <PaymentButton tripId={activeTrip.id} amount={activeTrip.price} paymentStatus={activeTrip.paymentStatus} />

@@ -14,6 +14,38 @@ const VEHICLES: { value: VehicleType; label: string }[] = [
   { value: "vip", label: "VIP" },
 ];
 
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+    setTimeout(() => {
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.type = "sine";
+      osc2.frequency.value = 880;
+      gain2.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc2.start();
+      osc2.stop(ctx.currentTime + 0.4);
+    }, 450);
+  } catch {
+    // ignore if audio not supported
+  }
+}
+
 export default function DriverPage() {
   const [user, setUser] = useState<User | null>(auth.currentUser);
   const [authChecked, setAuthChecked] = useState(false);
@@ -25,7 +57,9 @@ export default function DriverPage() {
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [alertTrip, setAlertTrip] = useState<TripRequest | null>(null);
   const watchIdRef = useRef<number | null>(null);
+  const knownTripIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -80,9 +114,21 @@ export default function DriverPage() {
   useEffect(() => {
     if (!online || !driverPos || activeTrip) {
       setOpenTrips([]);
+      knownTripIdsRef.current = new Set();
       return;
     }
-    const unsub = listenToOpenTrips(driverPos, 15, vehicleType, setOpenTrips);
+    const unsub = listenToOpenTrips(driverPos, 15, vehicleType, (trips) => {
+      const newOnes = trips.filter((t) => !knownTripIdsRef.current.has(t.id));
+      if (newOnes.length > 0 && knownTripIdsRef.current.size > 0) {
+        playBeep();
+        setAlertTrip(newOnes[0]);
+      } else if (newOnes.length > 0 && knownTripIdsRef.current.size === 0) {
+        playBeep();
+        setAlertTrip(newOnes[0]);
+      }
+      knownTripIdsRef.current = new Set(trips.map((t) => t.id));
+      setOpenTrips(trips);
+    });
     return unsub;
   }, [vehicleType, online, driverPos, activeTrip]);
 
@@ -90,6 +136,7 @@ export default function DriverPage() {
     if (!user) return;
     setNotice(null);
     setError(null);
+    setAlertTrip(null);
     const won = await acceptTrip(tripId, user.uid);
     if (!won) {
       setNotice("Too slow - another driver already accepted that trip.");
@@ -169,6 +216,35 @@ export default function DriverPage() {
       )}
       {notice && (
         <div className="absolute top-20 left-3 right-3 z-20 bg-amber-100 text-amber-700 text-sm px-3 py-2 rounded-lg shadow">{notice}</div>
+      )}
+
+      {alertTrip && !activeTrip && (
+        <div className="absolute inset-0 z-30 bg-black/40 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-3 animate-pulse-once">
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">New request</p>
+            <p className="text-lg font-bold">
+              {alertTrip.tripType === "person" ? "Passenger ride" : "Goods delivery"}
+            </p>
+            <p className="text-sm text-gray-600">{alertTrip.distanceKm} km &middot; {alertTrip.price} RWF</p>
+            {alertTrip.goodsDescription && (
+              <p className="text-sm text-gray-500">{alertTrip.goodsDescription}</p>
+            )}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setAlertTrip(null)}
+                className="flex-1 bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => handleAccept(alertTrip.id)}
+                className="flex-1 bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700"
+              >
+                Accept
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {activeTrip && (
