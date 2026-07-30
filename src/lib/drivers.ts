@@ -1,4 +1,4 @@
-import { ref, onValue, set, onDisconnect, update, query, orderByChild, startAt, endAt } from "firebase/database";
+import { ref, onValue, set, update, query, orderByChild, startAt, endAt } from "firebase/database";
 import { geohashForLocation, geohashQueryBounds, distanceBetween } from "geofire-common";
 import { db } from "../firebase";
 
@@ -29,13 +29,11 @@ export async function publishDriverLocation(
     vehicleType,
     status,
     geohash,
+    lastUpdated: Date.now(),
   });
 
-  // If the driver's connection drops (tab closed, laptop dies, network lost),
-  // Firebase's own servers flip them to offline automatically.
-  if (status === "online") {
-    await onDisconnect(driverRef).update({ status: "offline" });
-  }
+  // Driver stays online in the database until they press "Go offline" themselves.
+  // No auto-offline on disconnect/refresh/crash - fully manual.
 }
 
 export async function goOffline(driverId: string) {

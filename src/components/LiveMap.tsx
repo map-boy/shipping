@@ -53,9 +53,10 @@ interface Props {
   onLocationChange?: (loc: [number, number]) => void;
   trackedDriverId?: string | null;
   onRequestVehicle?: (vehicleType: VehicleType) => void;
+  fullScreen?: boolean;
 }
 
-export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVehicle }: Props) {
+export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVehicle, fullScreen }: Props) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const googleRef = useRef<typeof google | null>(null);
@@ -85,6 +86,8 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
           zoom: 13,
           streetViewControl: false,
           mapTypeControl: false,
+          fullscreenControl: false,
+          zoomControl: !fullScreen,
         });
 
         if (!navigator.geolocation) {
@@ -169,7 +172,7 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
       });
 
       const infoWindow = new google.maps.InfoWindow({
-        content: `<div style="font-size:13px;font-weight:600;text-transform:capitalize;">${driver.vehicleType}</div>
+        content: `<div style="font-size:14px;font-weight:600;text-transform:capitalize;">${driver.vehicleType}</div>
           <button id="request-${driver.id}" style="margin-top:8px;background:#2563eb;color:white;border:none;border-radius:8px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;width:100%;min-height:44px;">Request this vehicle</button>`,
       });
 
@@ -248,7 +251,6 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
               }
             })
             .catch(() => {
-              // fall back to straight-line estimate if route fetch fails
               const [dLng, dLat] = [position.lng - userLocation[0], position.lat - userLocation[1]];
               const distanceKm = Math.sqrt(dLng * dLng + dLat * dLat) * 111;
               setRouteInfo({ distanceKm: Math.round(distanceKm * 10) / 10, durationMin: Math.round(distanceKm * 3) });
@@ -266,15 +268,17 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
     };
   }, [trackedDriverId, userLocation]);
 
+  const mapHeightClass = fullScreen ? "w-full h-full" : "relative w-full h-[320px] rounded-xl overflow-hidden";
+
   return (
-    <div className="w-full">
+    <div className={fullScreen ? "relative w-full h-full" : "w-full"}>
       {!trackedDriverId && (
-        <div className="flex gap-2 mb-3">
+        <div className={fullScreen ? "absolute top-3 left-3 right-3 z-20 flex gap-2 overflow-x-auto" : "flex gap-2 mb-3"}>
           {VEHICLE_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               onClick={() => setVehicleFilter(opt.value)}
-              className={`px-4 py-2.5 rounded-lg text-sm font-medium border transition min-h-[44px] ${
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium border transition min-h-[44px] shadow ${
                 vehicleFilter === opt.value ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300"
               }`}
             >
@@ -284,21 +288,21 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
         </div>
       )}
 
-      <div className="relative w-full h-[320px] rounded-xl overflow-hidden">
+      <div className={mapHeightClass}>
         <div ref={mapContainer} className="w-full h-full" />
         {error && (
-          <div className="absolute top-2 left-2 bg-red-100 text-red-700 text-sm px-3 py-1 rounded">{error}</div>
+          <div className="absolute top-16 left-2 right-2 z-20 bg-red-100 text-red-700 text-sm px-3 py-2 rounded shadow">{error}</div>
         )}
       </div>
 
       {!trackedDriverId && (
-        <p className="mt-2 text-sm text-gray-600">
-          {nearbyDrivers.length} {vehicleFilter === "all" ? "vehicle(s)" : vehicleFilter + "(s)"} nearby &mdash; tap a vehicle on the map to request it
+        <p className={fullScreen ? "absolute bottom-3 left-3 z-20 bg-white shadow px-3 py-1.5 rounded-lg text-sm text-gray-600" : "mt-2 text-sm text-gray-600"}>
+          {nearbyDrivers.length} {vehicleFilter === "all" ? "vehicle(s)" : vehicleFilter + "(s)"} nearby
         </p>
       )}
       {trackedDriverId && (
-        <p className="mt-2 text-sm text-gray-600">
-          Your driver is on the way{routeInfo ? ` &mdash; ${routeInfo.distanceKm} km, about ${routeInfo.durationMin} min away` : ""}.
+        <p className={fullScreen ? "absolute top-3 left-3 right-3 z-20 bg-white shadow px-3 py-2 rounded-lg text-sm text-gray-600" : "mt-2 text-sm text-gray-600"}>
+          Your driver is on the way{routeInfo ? ` \u2014 ${routeInfo.distanceKm} km, about ${routeInfo.durationMin} min away` : ""}.
         </p>
       )}
     </div>
