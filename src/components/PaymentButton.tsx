@@ -77,7 +77,7 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
         placeholder="e.g. 25078XXXXXXX"
         value={phoneNumber}
         onChange={(e) => setPhoneNumber(e.target.value)}
-        className="w-full border rounded px-3 py-2"
+        className="w-full border rounded-lg px-3 py-3 text-base"
         disabled={isPending}
       />
       {error && <p className="text-red-600 text-sm">{error}</p>}
@@ -88,7 +88,7 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
       <button
         onClick={handlePay}
         disabled={isPending}
-        className="w-full bg-blue-600 text-white rounded py-2 font-medium disabled:opacity-50"
+        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700"
       >
         {isPending ? "Waiting..." : "Pay now"}
       </button>

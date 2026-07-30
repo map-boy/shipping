@@ -106,7 +106,7 @@ export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept }
           <div style="font-weight:600;margin-bottom:4px;">${trip.tripType === "person" ? "Passenger" : "Goods delivery"}</div>
           <div style="color:#6b7280;margin-bottom:6px;">Loading address...</div>
           <div style="color:#6b7280;margin-bottom:6px;">${trip.distanceKm} km &middot; ${trip.price} RWF</div>
-          <button id="accept-${trip.id}" style="background:#2563eb;color:white;border:none;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;width:100%;">Accept</button>
+          <button id="accept-${trip.id}" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;width:100%;min-height:44px;">Accept</button>
         </div>`,
       });
 

@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { searchPlaces, type GeocodeResult } from "../lib/geocode";
 
 interface Props {
@@ -54,7 +54,7 @@ export default function AddressSearch({ placeholder, onSelect }: Props) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => results.length > 0 && setOpen(true)}
-        className="w-full border rounded px-3 py-2"
+        className="w-full border rounded-lg px-3 py-3 text-base"
       />
       {open && results.length > 0 && (
         <ul className="absolute z-10 w-full bg-white border rounded mt-1 shadow-lg max-h-60 overflow-y-auto">
@@ -62,7 +62,7 @@ export default function AddressSearch({ placeholder, onSelect }: Props) {
             <li
               key={i}
               onClick={() => handleSelect(place)}
-              className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+              className="px-4 py-3 text-sm active:bg-gray-100 cursor-pointer min-h-[44px] flex items-center"
             >
               {place.name}
             </li>

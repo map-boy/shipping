@@ -131,12 +131,12 @@ export default function DriverPage() {
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
       <h1 className="text-2xl font-bold">Driver dashboard</h1>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <select
           value={vehicleType}
           onChange={(e) => setVehicleType(e.target.value as VehicleType)}
           disabled={!!activeTrip}
-          className="border rounded px-3 py-2"
+          className="border rounded-lg px-3 py-3 text-base"
         >
           {VEHICLES.map((v) => (
             <option key={v.value} value={v.value}>{v.label}</option>
@@ -146,7 +146,7 @@ export default function DriverPage() {
         <button
           onClick={() => setOnline((v) => !v)}
           disabled={!!activeTrip || resuming}
-          className={`px-4 py-2 rounded font-medium ${online ? "bg-green-600 text-white" : "bg-gray-200"}`}
+          className={`px-4 py-3 rounded-lg font-semibold text-base ${online ? "bg-green-600 text-white" : "bg-gray-200"}`}
         >
           {online ? "Online" : "Go online"}
         </button>
@@ -185,7 +185,7 @@ export default function DriverPage() {
           {activeTrip.status === "accepted" && (
             <button
               onClick={handleStartTrip}
-              className="w-full bg-blue-600 text-white rounded py-2 text-sm font-medium"
+              className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700"
             >
               Start trip
             </button>
@@ -193,7 +193,7 @@ export default function DriverPage() {
           {activeTrip.status === "in_progress" && (
             <button
               onClick={handleCompleteTrip}
-              className="w-full bg-green-600 text-white rounded py-2 text-sm font-medium"
+              className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-green-700"
             >
               Complete trip
             </button>

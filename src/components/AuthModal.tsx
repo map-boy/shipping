@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -59,7 +59,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
           aria-label="Close"
         >
-          ✕
+          ?
         </button>
 
         <h2 className="text-xl font-bold text-gray-900 mb-6">
@@ -79,7 +79,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
+            className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-700"
           />
           <input
             type="password"
@@ -87,12 +87,12 @@ export default function AuthModal({ onClose }: AuthModalProps) {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-700"
+            className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-700"
           />
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-cta hover:bg-ctaHover text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-50"
+            className="w-full bg-cta hover:bg-ctaHover text-white font-semibold py-3.5 text-base rounded-lg transition disabled:opacity-50"
           >
             {loading ? "Please wait..." : mode === "login" ? "Log in" : "Sign up"}
           </button>
@@ -107,7 +107,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
         <button
           onClick={handleGoogleAuth}
           disabled={loading}
-          className="w-full border border-gray-300 rounded-lg py-2.5 font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+          className="w-full border border-gray-300 rounded-lg py-3.5 text-base font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
         >
           Continue with Google
         </button>

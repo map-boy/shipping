@@ -170,7 +170,7 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
 
       const infoWindow = new google.maps.InfoWindow({
         content: `<div style="font-size:13px;font-weight:600;text-transform:capitalize;">${driver.vehicleType}</div>
-          <button id="request-${driver.id}" style="margin-top:6px;background:#2563eb;color:white;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">Request this vehicle</button>`,
+          <button id="request-${driver.id}" style="margin-top:8px;background:#2563eb;color:white;border:none;border-radius:8px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;width:100%;min-height:44px;">Request this vehicle</button>`,
       });
 
       infoWindow.addListener("domready", () => {
@@ -274,7 +274,7 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
             <button
               key={opt.value}
               onClick={() => setVehicleFilter(opt.value)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium border transition ${
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium border transition min-h-[44px] ${
                 vehicleFilter === opt.value ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300"
               }`}
             >

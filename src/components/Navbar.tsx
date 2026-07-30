@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import type { User } from "firebase/auth";
 
@@ -46,9 +46,9 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
 
   return (
     <>
-      <div className="bg-black py-1 pl-8">
+      <div className="bg-black py-1.5 px-4">
         <div className="max-w-7xl mx-auto px-4">
-          <ul className="flex gap-4 text-xs text-slate-300">
+          <ul className="flex gap-3 text-[11px] sm:text-xs text-slate-300 overflow-x-auto whitespace-nowrap">
             <li><a href="/" className="text-white">Personal Use</a></li>
             <li className="text-slate-500">Business Use (coming soon)</li>
             <li><Link to="/driver" className="hover:text-white">Transport Providers</Link></li>
@@ -59,7 +59,10 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
       <header className="relative bg-slate-800 w-full z-30">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16 md:h-20">
           <div className="flex items-center gap-2 font-bold text-xl text-white">
-            <Link to="/">TikTak</Link>
+            <Link to="/" className="flex items-center gap-2">
+              <svg width="28" height="28" viewBox="0 0 64 64"><defs><linearGradient id="navlogo" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fea142"/><stop offset="100%" stop-color="#f98b1b"/></linearGradient></defs><circle cx="32" cy="32" r="30" fill="url(#navlogo)"/><path d="M32 14c-7.2 0-13 5.8-13 13 0 9.7 13 23 13 23s13-13.3 13-23c0-7.2-5.8-13-13-13z" fill="white"/><circle cx="32" cy="27" r="5.5" fill="#0f4c8b"/></svg>
+              TikTak
+            </Link>
           </div>
 
           <nav className="hidden lg:flex items-center gap-6 text-sm text-slate-100">
@@ -120,7 +123,7 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
             )}
             <Link
               to="/ride"
-              className="bg-cta hover:bg-ctaHover text-white text-sm font-semibold px-4 py-2 rounded-full transition"
+              className="bg-cta hover:bg-ctaHover text-white text-sm font-semibold px-4 py-2.5 rounded-full transition min-h-[40px] flex items-center"
             >
               Book Now
             </Link>

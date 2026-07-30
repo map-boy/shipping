@@ -109,7 +109,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
             <p className="text-sm text-gray-500">Looking for a nearby driver...</p>
             <button
               onClick={handleCancel}
-              className="w-full bg-gray-200 text-gray-800 rounded py-2 text-sm font-medium"
+              className="w-full bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300"
             >
               Cancel request
             </button>
@@ -127,13 +127,13 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
       <div className="flex gap-2">
         <button
           onClick={() => setTripType("person")}
-          className={`px-4 py-2 rounded text-sm font-medium ${tripType === "person" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+          className={`px-4 py-3 rounded-lg text-base font-medium min-h-[44px] ${tripType === "person" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
         >
           People
         </button>
         <button
           onClick={() => setTripType("goods")}
-          className={`px-4 py-2 rounded text-sm font-medium ${tripType === "goods" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+          className={`px-4 py-3 rounded-lg text-base font-medium min-h-[44px] ${tripType === "goods" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
         >
           Goods
         </button>
@@ -145,7 +145,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
           placeholder="Describe the goods (e.g. furniture, fragile items)"
           value={goodsDescription}
           onChange={(e) => setGoodsDescription(e.target.value)}
-          className="w-full border rounded px-3 py-2"
+          className="w-full border rounded-lg px-3 py-3 text-base"
         />
       )}
 
@@ -163,7 +163,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
             <button
               key={opt.value}
               onClick={() => setVehicleType(opt.value)}
-              className={`w-full flex items-center justify-between border rounded-lg px-3 py-2 text-left ${
+              className={`w-full flex items-center justify-between border rounded-lg px-3 py-3 text-left min-h-[44px] ${
                 vehicleType === opt.value ? "border-blue-600 bg-blue-50" : "border-gray-200"
               }`}
             >
@@ -181,7 +181,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
             <button
               key={v.value}
               onClick={() => setVehicleType(v.value)}
-              className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-left ${
+              className={`w-full flex items-center gap-2 border rounded-lg px-3 py-3 text-left min-h-[44px] ${
                 vehicleType === v.value ? "border-blue-600 bg-blue-50" : "border-gray-200"
               }`}
             >
@@ -196,7 +196,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
       <button
         onClick={handleRequest}
         disabled={!estimate}
-        className="w-full bg-blue-600 text-white rounded py-2 font-medium disabled:opacity-50"
+        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700"
       >
         {estimate
           ? `Request ${tripType === "person" ? "ride" : "delivery"} Â· ${estimate.price} RWF`
