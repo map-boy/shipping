@@ -60,6 +60,7 @@ export default function DriverPage() {
   const [alertTrip, setAlertTrip] = useState<TripRequest | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const knownTripIdsRef = useRef<Set<string>>(new Set());
+  const ignoredTripIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -117,7 +118,8 @@ export default function DriverPage() {
       knownTripIdsRef.current = new Set();
       return;
     }
-    const unsub = listenToOpenTrips(driverPos, 15, vehicleType, (trips) => {
+    const unsub = listenToOpenTrips(driverPos, 15, vehicleType, (rawTrips) => {
+      const trips = rawTrips.filter((t) => !ignoredTripIdsRef.current.has(t.id));
       const newOnes = trips.filter((t) => !knownTripIdsRef.current.has(t.id));
       if (newOnes.length > 0 && knownTripIdsRef.current.size > 0) {
         playBeep();
@@ -137,6 +139,7 @@ export default function DriverPage() {
     setNotice(null);
     setError(null);
     setAlertTrip(null);
+    ignoredTripIdsRef.current.add(tripId);
     const won = await acceptTrip(tripId, user.uid);
     if (!won) {
       setNotice("Too slow - another driver already accepted that trip.");
