@@ -1,10 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { createTripRequest, listenToTrip, updateTripStatus, type TripRequest, type TripType } from "../lib/trips";
 import type { VehicleType } from "../lib/drivers";
 import { estimateFare } from "../lib/fare";
 import { auth } from "../firebase";
 import PaymentButton from "./PaymentButton";
-import AddressSearch from "./AddressSearch";
 import type { GeocodeResult } from "../lib/geocode";
 
 const VEHICLES: { value: VehicleType; label: string }[] = [
@@ -15,18 +14,14 @@ const VEHICLES: { value: VehicleType; label: string }[] = [
 
 interface Props {
   userLocation: [number, number] | null;
+  destination: GeocodeResult | null;
   onTripChange?: (trip: TripRequest | null) => void;
   preselectedVehicle?: VehicleType | null;
 }
 
-export default function BookingForm({ userLocation, onTripChange, preselectedVehicle }: Props) {
+export default function BookingForm({ userLocation, destination, onTripChange, preselectedVehicle }: Props) {
   const [tripType, setTripType] = useState<TripType>("person");
-  const [vehicleType, setVehicleType] = useState<VehicleType>("standard");
-
-  useEffect(() => {
-    if (preselectedVehicle) setVehicleType(preselectedVehicle);
-  }, [preselectedVehicle]);
-  const [destination, setDestination] = useState<GeocodeResult | null>(null);
+  const [vehicleType, setVehicleType] = useState<VehicleType>(preselectedVehicle || "standard");
   const [goodsDescription, setGoodsDescription] = useState("");
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,25 +53,19 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
   }
 
   async function handleRequest() {
-    console.log("[handleRequest] clicked");
     setError(null);
     if (!userLocation) {
-      console.log("[handleRequest] blocked: no userLocation");
       setError("Waiting for your location...");
       return;
     }
     if (!destination) {
-      console.log("[handleRequest] blocked: no destination");
-      setError("Please choose your destination from the suggestions.");
+      setError("Please choose your destination on the map first.");
       return;
     }
     if (!auth.currentUser) {
-      console.log("[handleRequest] blocked: not logged in");
       setError("Please log in first.");
       return;
     }
-
-    console.log("[handleRequest] proceeding, uid:", auth.currentUser.uid);
 
     try {
       const [lng, lat] = userLocation;
@@ -88,29 +77,22 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
         { lat: destination.lat, lng: destination.lng },
         tripType === "goods" ? goodsDescription : undefined
       );
-      console.log("[handleRequest] trip created with id:", tripId);
       listenToTrip(tripId, updateTrip);
     } catch (err) {
-      console.error("[handleRequest] createTripRequest FAILED:", err);
       setError("Failed to create trip: " + (err instanceof Error ? err.message : String(err)));
     }
   }
 
   if (activeTrip) {
     return (
-      <div className="p-4 border rounded-lg bg-gray-50 space-y-3">
+      <div className="space-y-3">
         <p className="font-medium">Trip status: {activeTrip.status}</p>
-        <p className="text-sm text-gray-600">
-          {activeTrip.distanceKm} km Â· {activeTrip.price} RWF
-        </p>
+        <p className="text-sm text-gray-600">{activeTrip.distanceKm} km &middot; {activeTrip.price} RWF</p>
         {activeTrip.driverId && <p className="text-sm text-gray-600">Driver assigned: {activeTrip.driverId}</p>}
         {activeTrip.status === "requested" && (
           <>
             <p className="text-sm text-gray-500">Looking for a nearby driver...</p>
-            <button
-              onClick={handleCancel}
-              className="w-full bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300"
-            >
+            <button onClick={handleCancel} className="w-full bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300">
               Cancel request
             </button>
           </>
@@ -123,7 +105,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
   }
 
   return (
-    <div className="p-4 border rounded-lg space-y-3">
+    <div className="space-y-3">
       <div className="flex gap-2">
         <button
           onClick={() => setTripType("person")}
@@ -149,10 +131,9 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
         />
       )}
 
-      <AddressSearch
-        placeholder="Where are you going? (street, district...)"
-        onSelect={setDestination}
-      />
+      {!destination && (
+        <p className="text-sm text-gray-500">Search your destination on the map above to see prices.</p>
+      )}
       {destination && (
         <p className="text-sm text-gray-500">Destination: {destination.name}</p>
       )}
@@ -167,7 +148,9 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
                 vehicleType === opt.value ? "border-blue-600 bg-blue-50" : "border-gray-200"
               }`}
             >
-              <span className="flex items-center gap-2"><span><span className="block font-medium">{opt.label}</span>
+              <span className="flex items-center gap-2">
+                <span>
+                  <span className="block font-medium">{opt.label}</span>
                   <span className="block text-xs text-gray-500">{opt.estimate.distanceKm} km</span>
                 </span>
               </span>
@@ -199,7 +182,7 @@ export default function BookingForm({ userLocation, onTripChange, preselectedVeh
         className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700"
       >
         {estimate
-          ? `Request ${tripType === "person" ? "ride" : "delivery"} Â· ${estimate.price} RWF`
+          ? `Request ${tripType === "person" ? "ride" : "delivery"} \u00b7 ${estimate.price} RWF`
           : `Choose a destination to see price`}
       </button>
     </div>

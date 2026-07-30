@@ -1,15 +1,18 @@
 import { useState } from "react";
 import LiveMap from "./LiveMap";
 import BookingForm from "./BookingForm";
+import AddressSearch from "./AddressSearch";
 import { publishDriverLocation, type VehicleType } from "../lib/drivers";
 import type { TripRequest } from "../lib/trips";
+import type { GeocodeResult } from "../lib/geocode";
 
 export default function RidePage() {
   const [seeding, setSeeding] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [preselectedVehicle, setPreselectedVehicle] = useState<VehicleType | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(true);
+  const [destination, setDestination] = useState<GeocodeResult | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   async function seedTestDrivers() {
     setSeeding(true);
@@ -36,6 +39,20 @@ export default function RidePage() {
         fullScreen
       />
 
+      {!trackedDriverId && !activeTrip && (
+        <div className="absolute top-16 left-3 right-3 z-20">
+          <div className="bg-white rounded-xl shadow-lg p-1">
+            <AddressSearch
+              placeholder="Where are you going?"
+              onSelect={(place) => {
+                setDestination(place);
+                setSheetOpen(true);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {import.meta.env.DEV && (
         <button
           onClick={seedTestDrivers}
@@ -46,12 +63,12 @@ export default function RidePage() {
         </button>
       )}
 
-      {!sheetOpen && (
+      {!sheetOpen && (destination || activeTrip) && (
         <button
           onClick={() => setSheetOpen(true)}
           className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white font-semibold px-6 py-3 rounded-full shadow-lg"
         >
-          Where to?
+          {activeTrip ? "Trip details" : "Choose a ride"}
         </button>
       )}
 
@@ -71,6 +88,7 @@ export default function RidePage() {
           <div className="px-4 pb-6">
             <BookingForm
               userLocation={userLocation}
+              destination={destination}
               onTripChange={setActiveTrip}
               preselectedVehicle={preselectedVehicle}
             />
