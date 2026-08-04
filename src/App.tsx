@@ -26,7 +26,6 @@ export default function App() {
         <Navbar
           user={user}
           onLoginClick={() => setShowAuth(true)}
-          onLogoutClick={() => signOut(auth)}
         />
         <Routes>
           <Route path="/" element={<Home />} />

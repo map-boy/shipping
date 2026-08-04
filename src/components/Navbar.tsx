@@ -6,10 +6,9 @@ import { services } from "../lib/services";
 interface NavbarProps {
   user: User | null;
   onLoginClick: () => void;
-  onLogoutClick: () => void;
 }
 
-export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProps) {
+export default function Navbar({ user, onLoginClick }: NavbarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
