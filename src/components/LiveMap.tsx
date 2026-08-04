@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { listenNearbyDrivers, type DriverLocation, type VehicleType } from "../lib/drivers";
 import { listenToDriverLocation } from "../lib/trackDriver";
@@ -84,10 +84,15 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
         map.current = new google.maps.Map(mapContainer.current!, {
           center: { lat: -1.9441, lng: 30.0619 },
           zoom: 13,
+          minZoom: 6,
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: false,
           zoomControl: !fullScreen,
+          restriction: {
+            latLngBounds: { north: 0.5, south: -4.5, east: 32.5, west: 27.5 },
+            strictBounds: false,
+          },
         });
 
         if (!navigator.geolocation) {
@@ -268,7 +273,7 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
     };
   }, [trackedDriverId, userLocation]);
 
-  const mapHeightClass = fullScreen ? "w-full h-full" : "relative w-full h-[320px] rounded-xl overflow-hidden";
+  const mapHeightClass = fullScreen ? "w-full h-full" : "relative w-full h-[240px] sm:h-[320px] md:h-[420px] rounded-2xl overflow-hidden border border-gray-200 shadow-md";
 
   return (
     <div className={fullScreen ? "relative w-full h-full" : "w-full"}>
@@ -289,7 +294,20 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
       )}
 
       <div className={mapHeightClass}>
-        <div ref={mapContainer} className="w-full h-full" />
+        <div
+          className={
+            fullScreen
+              ? "absolute inset-1 sm:inset-2 md:inset-3 rounded-2xl overflow-hidden border-2 border-white shadow-2xl ring-1 ring-black/10"
+              : "relative w-full h-full rounded-2xl overflow-hidden border-2 border-white shadow-xl ring-1 ring-black/10"
+          }
+        >
+          <div ref={mapContainer} className="w-full h-full" />
+
+          <div className="pointer-events-none absolute top-0 left-0 w-7 h-7 border-t-[3px] border-l-[3px] border-cta rounded-tl-2xl" />
+          <div className="pointer-events-none absolute top-0 right-0 w-7 h-7 border-t-[3px] border-r-[3px] border-cta rounded-tr-2xl" />
+          <div className="pointer-events-none absolute bottom-0 left-0 w-7 h-7 border-b-[3px] border-l-[3px] border-cta rounded-bl-2xl" />
+          <div className="pointer-events-none absolute bottom-0 right-0 w-7 h-7 border-b-[3px] border-r-[3px] border-cta rounded-br-2xl" />
+        </div>
         {error && (
           <div className="absolute top-16 left-2 right-2 z-20 bg-red-100 text-red-700 text-sm px-3 py-2 rounded shadow">{error}</div>
         )}

@@ -7,6 +7,12 @@
         ".write": "auth != null && auth.uid === $driverId"
       }
     },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
     "trips": {
       ".read": "auth != null",
       ".indexOn": ["pickupGeohash"],

@@ -1,17 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+﻿import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import type { User } from "firebase/auth";
-
-const services = [
-  "Furniture Delivery",
-  "Motorbike Transport",
-  "Car Transport",
-  "Man And Van",
-  "eBay Deliveries",
-  "Fragile Item Transport",
-  "Boat Transport",
-  "Removals",
-];
+import { services } from "../lib/services";
 
 interface NavbarProps {
   user: User | null;
@@ -80,13 +70,13 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
                 <div className="absolute left-0 bg-white rounded-lg shadow-md text-slate-700">
                   <ul className="text-sm py-1">
                     {services.map((s) => (
-                      <li key={s}>
+                      <li key={s.slug}>
                         <Link
-                          to="/ride"
+                          to={`/services/${s.slug}`}
                           onClick={() => setServicesOpen(false)}
                           className="block px-4 py-1 whitespace-nowrap hover:bg-gray-100 hover:text-cta rounded-lg"
                         >
-                          {s}
+                          {s.name}
                         </Link>
                       </li>
                     ))}
@@ -103,15 +93,15 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
           <div className="flex items-center gap-3">
             {user ? (
               <>
-                <span className="hidden sm:inline text-sm text-slate-100">
-                  {user.email ?? user.displayName}
-                </span>
-                <button
-                  onClick={onLogoutClick}
-                  className="hidden sm:inline text-sm text-slate-100 hover:text-cta"
+                <Link
+                  to="/profile"
+                  className="hidden sm:flex items-center gap-1.5 text-sm text-slate-100 hover:text-cta border border-slate-600 hover:border-cta rounded-full px-3 py-1.5 transition"
                 >
-                  Log out
-                </button>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                  Profile
+                </Link>
               </>
             ) : (
               <button
@@ -144,7 +134,7 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
           <div ref={mobileMenuRef} className="lg:hidden fixed top-16 left-0 w-full h-screen bg-white shadow-lg z-50 px-4 py-4">
             <ul className="text-gray-700 space-y-3">
               {user ? (
-                <li><button onClick={onLogoutClick} className="block hover:text-cta">Log out</button></li>
+                <li><Link to="/profile" className="block hover:text-cta" onClick={() => setMobileOpen(false)}>Profile</Link></li>
               ) : (
                 <li><button onClick={onLoginClick} className="block hover:text-cta">Log in</button></li>
               )}
@@ -152,7 +142,7 @@ export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProp
               <li><Link to="/driver" className="block hover:text-cta" onClick={() => setMobileOpen(false)}>Drive with TikTak</Link></li>
               <li><a href="/#how" className="block hover:text-cta">How It Works</a></li>
               {services.map((s) => (
-                <li key={s}><Link to="/ride" className="block hover:text-cta" onClick={() => setMobileOpen(false)}>{s}</Link></li>
+                <li key={s.slug}><Link to={`/services/${s.slug}`} className="block hover:text-cta" onClick={() => setMobileOpen(false)}>{s.name}</Link></li>
               ))}
             </ul>
           </div>

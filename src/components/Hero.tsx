@@ -1,5 +1,5 @@
-﻿import { Link } from "react-router-dom";
-import heroImg from "../assets/hero-photo.jpg";
+import { Link } from "react-router-dom";
+import heroImg from "../assets/Kigali.jpg";
 const categories = [
   "Furniture & General Items", "Boxes", "Cars", "Motorcycles",
   "Other Vehicles", "Moving Home", "Haulage", "Boats",

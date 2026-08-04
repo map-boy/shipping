@@ -8,6 +8,8 @@ import RidePage from "./components/RidePage";
 import DriverPage from "./components/DriverPage";
 import Footer from "./components/Footer";
 import AuthModal from "./components/AuthModal";
+import Profile from "./components/Profile";
+import ServicePage from "./components/ServicePage";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -30,6 +32,8 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/ride" element={<RidePage />} />
           <Route path="/driver" element={<DriverPage />} />
+          <Route path="/profile" element={<Profile user={user} onLogoutClick={() => signOut(auth)} />} />
+          <Route path="/services/:slug" element={<ServicePage />} />
         </Routes>
         <Footer />
         {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
@@ -37,4 +41,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
