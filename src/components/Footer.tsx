@@ -16,55 +16,59 @@ export default function Footer() {
 
           <div className="col-span-2 sm:col-span-12 lg:col-span-3">
             <h3 className="text-white font-bold text-lg mb-2">About Us</h3>
-            <div className="w-10 h-0.5 bg-red-600 mb-4"></div>
+            <div className="w-10 h-0.5 bg-cta mb-4"></div>
             <p className="text-sm text-slate-400 leading-relaxed">
-              TikTak connects riders and senders with nearby drivers for people
-              and goods transport, cars, motorbikes, and vans, with live
+              TikTak Rwanda connects riders and senders with nearby taxi drivers
+              for people and goods transport across Kigali, with live
               tracking and Mobile Money payments.
             </p>
             <div className="flex gap-2 mt-5">
-              {socials.map((s) => (<a key={s.label} href={s.href} aria-label={s.label} className="w-9 h-9 rounded-full border border-slate-600 flex items-center justify-center text-slate-300 hover:bg-cta hover:border-cta hover:text-white transition"><svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d={s.path} /></svg></a>))}
+              {socials.map((s) => (
+                <a key={s.label} href={s.href} aria-label={s.label} className="w-9 h-9 rounded-full border border-slate-600 flex items-center justify-center text-slate-300 hover:bg-cta hover:border-cta hover:text-white hover:-translate-y-0.5 transition">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d={s.path} /></svg>
+                </a>
+              ))}
             </div>
           </div>
 
           <div className="col-span-1 sm:col-span-6 lg:col-span-3">
             <h3 className="text-white font-bold text-lg mb-2">Services</h3>
-            <div className="w-10 h-0.5 bg-red-600 mb-4"></div>
+            <div className="w-10 h-0.5 bg-cta mb-4"></div>
             <ul className="text-sm space-y-2">
-              <li><Link to="/ride" className="hover:text-cta transition">Book a Ride</Link></li>
-              <li><Link to="/ride" className="hover:text-cta transition">Courier Services</Link></li>
+              <li><Link to="/ride" className="hover:text-cta transition">Book a Taxi</Link></li>
+              <li><Link to="/ride" className="hover:text-cta transition">Parcel Delivery</Link></li>
               <li><Link to="/ride" className="hover:text-cta transition">Large Item Delivery</Link></li>
-              <li><Link to="/ride" className="hover:text-cta transition">Man And Van</Link></li>
+              <li><Link to="/ride" className="hover:text-cta transition">Truck &amp; Van Delivery</Link></li>
               <li><Link to="/driver" className="hover:text-cta transition">Drive with TikTak</Link></li>
             </ul>
           </div>
 
           <div className="col-span-1 sm:col-span-6 lg:col-span-3">
             <h3 className="text-white font-bold text-lg mb-2">Quick Links</h3>
-            <div className="w-10 h-0.5 bg-red-600 mb-4"></div>
+            <div className="w-10 h-0.5 bg-cta mb-4"></div>
             <ul className="text-sm space-y-2">
               <li><Link to="/" className="hover:text-cta transition">Home</Link></li>
               <li><a href="/#about" className="hover:text-cta transition">About Us</a></li>
               <li><a href="/#how" className="hover:text-cta transition">How It Works</a></li>
-              <li><a href="/#faq" className="hover:text-cta transition">FAQ</a></li>
+              <li><a href="/#help" className="hover:text-cta transition">FAQ</a></li>
               <li><Link to="/driver" className="hover:text-cta transition">Become a Driver</Link></li>
             </ul>
           </div>
 
           <div className="col-span-2 sm:col-span-12 lg:col-span-3">
             <h3 className="text-white font-bold text-lg mb-2">Contact Us</h3>
-            <div className="w-10 h-0.5 bg-red-600 mb-4"></div>
+            <div className="w-10 h-0.5 bg-cta mb-4"></div>
             <ul className="text-sm space-y-3 text-slate-400">
               <li>+250 7XX XXX XXX</li>
               <li>support@tiktak.rw</li>
-              <li>Monday - Sunday: 6:00 AM - 11:00 PM</li>
+              <li>Daily: 6:00 AM - 11:00 PM</li>
               <li>Kigali, Rwanda</li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-slate-700 pt-5 text-xs text-slate-500 text-center">
-          Copyright {new Date().getFullYear()} | All Rights Reserved - TikTak Ltd.
+          Copyright {new Date().getFullYear()} | All Rights Reserved - TikTak Rwanda Ltd.
         </div>
       </div>
     </footer>

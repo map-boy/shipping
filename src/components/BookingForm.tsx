@@ -1,10 +1,11 @@
-import { useState, useMemo } from "react";
+﻿import { useState, useMemo } from "react";
 import { createTripRequest, listenToTrip, updateTripStatus, type TripRequest, type TripType } from "../lib/trips";
 import type { VehicleType } from "../lib/drivers";
 import { estimateFare } from "../lib/fare";
 import { auth } from "../firebase";
 import PaymentButton from "./PaymentButton";
 import type { GeocodeResult } from "../lib/geocode";
+import { useToast } from "./Toast";
 
 const VEHICLES: { value: VehicleType; label: string }[] = [
   { value: "standard", label: "Standard" },
@@ -20,11 +21,14 @@ interface Props {
 }
 
 export default function BookingForm({ userLocation, destination, onTripChange, preselectedVehicle }: Props) {
+  const { showToast } = useToast();
   const [tripType, setTripType] = useState<TripType>("person");
   const [vehicleType, setVehicleType] = useState<VehicleType>(preselectedVehicle || "standard");
   const [goodsDescription, setGoodsDescription] = useState("");
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requesting, setRequesting] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const rideOptions = useMemo(() => {
     if (!userLocation || !destination) return null;
@@ -46,6 +50,7 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
   function updateTrip(trip: TripRequest | null) {
     if (!trip && activeTrip && (activeTrip.status === "accepted" || activeTrip.status === "in_progress")) {
       setJustCompleted(true);
+      showToast("Trip completed! Thank you for riding with us.", "success");
       setTimeout(() => setJustCompleted(false), 6000);
     }
     setActiveTrip(trip);
@@ -54,25 +59,37 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
 
   async function handleCancel() {
     if (!activeTrip) return;
-    await updateTripStatus(activeTrip.id, "cancelled");
-    updateTrip(null);
+    setCancelling(true);
+    try {
+      await updateTripStatus(activeTrip.id, "cancelled");
+      showToast("Ride request cancelled.", "info");
+      updateTrip(null);
+    } catch (err) {
+      showToast("Could not cancel the ride. Please try again.", "error");
+    } finally {
+      setCancelling(false);
+    }
   }
 
   async function handleRequest() {
     setError(null);
     if (!userLocation) {
       setError("Waiting for your location...");
+      showToast("Waiting for your location...", "error");
       return;
     }
     if (!destination) {
       setError("Please choose your destination on the map first.");
+      showToast("Please choose your destination first.", "error");
       return;
     }
     if (!auth.currentUser) {
       setError("Please log in first.");
+      showToast("Please log in first.", "error");
       return;
     }
 
+    setRequesting(true);
     try {
       const [lng, lat] = userLocation;
       const tripId = await createTripRequest(
@@ -84,8 +101,13 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
         tripType === "goods" ? goodsDescription : undefined
       );
       listenToTrip(tripId, updateTrip);
+      showToast(tripType === "person" ? "Ride requested! Looking for a driver..." : "Delivery requested! Looking for a driver...", "success");
     } catch (err) {
-      setError("Failed to create trip: " + (err instanceof Error ? err.message : String(err)));
+      const message = "Failed to create trip: " + (err instanceof Error ? err.message : String(err));
+      setError(message);
+      showToast("Failed to request the ride. Please try again.", "error");
+    } finally {
+      setRequesting(false);
     }
   }
 
@@ -126,8 +148,15 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
           <p className="text-sm text-gray-500 text-center">Your driver's location is shown live on the map above.</p>
         )}
         {activeTrip.status === "requested" && (
-          <button onClick={handleCancel} className="w-full bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300">
-            Cancel request
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="w-full bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {cancelling && (
+              <span className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+            )}
+            {cancelling ? "Cancelling..." : "Cancel request"}
           </button>
         )}
         {(activeTrip.status === "accepted" || activeTrip.status === "in_progress") && (
@@ -211,10 +240,15 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
 
       <button
         onClick={handleRequest}
-        disabled={!estimate}
-        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700"
+        disabled={!estimate || requesting}
+        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700 flex items-center justify-center gap-2"
       >
-        {estimate
+        {requesting && (
+          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        )}
+        {requesting
+          ? "Requesting..."
+          : estimate
           ? `Request ${tripType === "person" ? "ride" : "delivery"} \u00b7 ${estimate.price} RWF`
           : `Choose a destination to see price`}
       </button>

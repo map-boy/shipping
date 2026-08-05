@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { publishDriverLocation, goOffline, type VehicleType } from "../lib/drivers";
 import DriverMap from "./DriverMap";
 import { ref, get } from "firebase/database";
@@ -7,6 +7,7 @@ import { listenToOpenTrips, listenToTrip, acceptTrip, updateTripStatus, markCash
 import { auth } from "../firebase";
 import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
+import { useToast } from "./Toast";
 
 const VEHICLES: { value: VehicleType; label: string }[] = [
   { value: "standard", label: "Standard" },
@@ -47,6 +48,7 @@ function playBeep() {
 }
 
 export default function DriverPage() {
+  const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(auth.currentUser);
   const [authChecked, setAuthChecked] = useState(false);
   const [online, setOnline] = useState(() => localStorage.getItem("driverOnline") === "true");
@@ -56,8 +58,11 @@ export default function DriverPage() {
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [alertTrip, setAlertTrip] = useState<TripRequest | null>(null);
+  const [accepting, setAccepting] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [markingCash, setMarkingCash] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const watchIdRef = useRef<number | null>(null);
   const knownTripIdsRef = useRef<Set<string>>(new Set());
   const ignoredTripIdsRef = useRef<Set<string>>(new Set());
@@ -103,7 +108,10 @@ export default function DriverPage() {
         setDriverPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         publishDriverLocation(driverId, pos.coords.latitude, pos.coords.longitude, vehicleType, "online");
       },
-      (err) => setError(err.message),
+      (err) => {
+        setError(err.message);
+        showToast("Location error: " + err.message, "error");
+      },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
     );
 
@@ -121,12 +129,10 @@ export default function DriverPage() {
     const unsub = listenToOpenTrips(driverPos, 15, vehicleType, (rawTrips) => {
       const trips = rawTrips.filter((t) => !ignoredTripIdsRef.current.has(t.id));
       const newOnes = trips.filter((t) => !knownTripIdsRef.current.has(t.id));
-      if (newOnes.length > 0 && knownTripIdsRef.current.size > 0) {
+      if (newOnes.length > 0) {
         playBeep();
         setAlertTrip(newOnes[0]);
-      } else if (newOnes.length > 0 && knownTripIdsRef.current.size === 0) {
-        playBeep();
-        setAlertTrip(newOnes[0]);
+        showToast("New ride request nearby!", "info");
       }
       knownTripIdsRef.current = new Set(trips.map((t) => t.id));
       setOpenTrips(trips);
@@ -136,44 +142,68 @@ export default function DriverPage() {
 
   async function handleAccept(tripId: string) {
     if (!user) return;
-    setNotice(null);
     setError(null);
     setAlertTrip(null);
+    setAccepting(true);
     ignoredTripIdsRef.current.add(tripId);
-    const won = await acceptTrip(tripId, user.uid);
-    if (!won) {
-      setNotice("Too slow - another driver already accepted that trip.");
-      return;
+    try {
+      const won = await acceptTrip(tripId, user.uid);
+      if (!won) {
+        showToast("Too slow - another driver already accepted that trip.", "error");
+        return;
+      }
+      showToast("Trip accepted!", "success");
+      listenToTrip(tripId, (trip) => {
+        setActiveTrip(trip);
+      });
+    } catch (err: any) {
+      showToast(err.message || "Could not accept the trip.", "error");
+    } finally {
+      setAccepting(false);
     }
-    listenToTrip(tripId, (trip) => {
-      setActiveTrip(trip);
-    });
   }
 
   async function handleStartTrip() {
     if (!activeTrip) return;
-    await updateTripStatus(activeTrip.id, "in_progress");
+    setStarting(true);
+    try {
+      await updateTripStatus(activeTrip.id, "in_progress");
+      showToast("Trip started.", "success");
+    } catch (err: any) {
+      showToast(err.message || "Could not start the trip.", "error");
+    } finally {
+      setStarting(false);
+    }
   }
 
   async function handleMarkCash() {
     if (!activeTrip) return;
     setError(null);
+    setMarkingCash(true);
     try {
       await markCashPayment(activeTrip.id);
+      showToast("Marked as paid in cash.", "success");
     } catch (err: any) {
       setError(err.message || "Could not mark as paid in cash.");
+      showToast(err.message || "Could not mark as paid in cash.", "error");
+    } finally {
+      setMarkingCash(false);
     }
   }
 
   async function handleCompleteTrip() {
     if (!activeTrip) return;
     setError(null);
+    setCompleting(true);
     try {
       await completeTrip(activeTrip.id);
-      setNotice("Trip completed! Payment confirmed.");
+      showToast("Trip completed! Payment confirmed.", "success");
       setActiveTrip(null);
     } catch (err: any) {
       setError(err.message || "Could not complete trip. Make sure payment is done first.");
+      showToast(err.message || "Could not complete trip. Make sure payment is done first.", "error");
+    } finally {
+      setCompleting(false);
     }
   }
 
@@ -230,9 +260,6 @@ export default function DriverPage() {
       {error && (
         <div className="absolute top-20 left-3 right-3 z-20 bg-red-100 text-red-700 text-sm px-3 py-2 rounded-lg shadow">{error}</div>
       )}
-      {notice && (
-        <div className="absolute top-20 left-3 right-3 z-20 bg-amber-100 text-amber-700 text-sm px-3 py-2 rounded-lg shadow">{notice}</div>
-      )}
 
       {alertTrip && !activeTrip && (
         <div className="absolute inset-0 z-30 bg-black/40 flex items-end sm:items-center justify-center p-4">
@@ -248,15 +275,20 @@ export default function DriverPage() {
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setAlertTrip(null)}
-                className="flex-1 bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300"
+                disabled={accepting}
+                className="flex-1 bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300 disabled:opacity-50"
               >
                 Dismiss
               </button>
               <button
                 onClick={() => handleAccept(alertTrip.id)}
-                className="flex-1 bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700"
+                disabled={accepting}
+                className="flex-1 bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Accept
+                {accepting && (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {accepting ? "Accepting..." : "Accept"}
               </button>
             </div>
           </div>
@@ -279,9 +311,13 @@ export default function DriverPage() {
             {activeTrip.status === "accepted" && (
               <button
                 onClick={handleStartTrip}
-                className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700"
+                disabled={starting}
+                className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Start trip
+                {starting && (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {starting ? "Starting..." : "Start trip"}
               </button>
             )}
             {activeTrip.status === "in_progress" && (
@@ -299,17 +335,24 @@ export default function DriverPage() {
                 {activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash" && (
                   <button
                     onClick={handleMarkCash}
-                    className="w-full bg-amber-500 text-white rounded-lg py-3.5 text-base font-semibold active:bg-amber-600"
+                    disabled={markingCash}
+                    className="w-full bg-amber-500 text-white rounded-lg py-3.5 text-base font-semibold active:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    Mark as paid in cash (system down)
+                    {markingCash && (
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    )}
+                    {markingCash ? "Marking..." : "Mark as paid in cash (system down)"}
                   </button>
                 )}
                 <button
                   onClick={handleCompleteTrip}
-                  disabled={activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash"}
-                  className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-green-700"
+                  disabled={completing || (activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash")}
+                  className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-green-700 flex items-center justify-center gap-2"
                 >
-                  Complete trip
+                  {completing && (
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {completing ? "Completing..." : "Complete trip"}
                 </button>
               </div>
             )}

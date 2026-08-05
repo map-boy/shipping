@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
+import { useToast } from "./Toast";
 
 interface Props {
   tripId: string;
@@ -9,10 +10,12 @@ interface Props {
 }
 
 export default function PaymentButton({ tripId, amount, paymentStatus }: Props) {
+  const { showToast } = useToast();
   const [phoneNumber, setPhoneNumber] = useState("");
   const [requesting, setRequesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevStatusRef = useRef<string | undefined>(paymentStatus);
 
   useEffect(() => {
     return () => {
@@ -20,8 +23,17 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
     };
   }, []);
 
-  // Stop polling once Firestore/RTDB confirms a terminal state
+  // Stop polling once Firestore/RTDB confirms a terminal state, and toast the outcome
   useEffect(() => {
+    if (paymentStatus !== prevStatusRef.current) {
+      if (paymentStatus === "successful") {
+        showToast("Payment received. Thank you!", "success");
+      } else if (paymentStatus === "failed") {
+        showToast("Payment failed. Please try again.", "error");
+      }
+      prevStatusRef.current = paymentStatus;
+    }
+
     if (paymentStatus === "successful" || paymentStatus === "failed") {
       if (pollRef.current) {
         clearInterval(pollRef.current);
@@ -29,20 +41,21 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
       }
       setRequesting(false);
     }
-  }, [paymentStatus]);
+  }, [paymentStatus, showToast]);
 
   function normalizePhone(raw: string): string {
-  const digits = raw.replace(/[^0-9]/g, "");
-  if (digits.startsWith("250")) return digits;
-  if (digits.startsWith("0")) return "250" + digits.slice(1);
-  if (digits.startsWith("7")) return "250" + digits;
-  return digits;
-}
+    const digits = raw.replace(/[^0-9]/g, "");
+    if (digits.startsWith("250")) return digits;
+    if (digits.startsWith("0")) return "250" + digits.slice(1);
+    if (digits.startsWith("7")) return "250" + digits;
+    return digits;
+  }
 
-async function handlePay() {
+  async function handlePay() {
     setError(null);
     if (!phoneNumber) {
       setError("Enter your Mobile Money phone number.");
+      showToast("Enter your Mobile Money phone number.", "error");
       return;
     }
     setRequesting(true);
@@ -51,9 +64,11 @@ async function handlePay() {
       const requestMomoPayment = httpsCallable(functions, "requestMomoPayment");
       const result: any = await requestMomoPayment({ phoneNumber: normalizePhone(phoneNumber), tripId });
       const referenceId = result.data.referenceId;
+      showToast("Payment request sent. Check your phone to confirm.", "info");
       pollStatus(referenceId);
     } catch (err: any) {
       setError(err.message || "Payment request failed.");
+      showToast(err.message || "Payment request failed. Please try again.", "error");
       setRequesting(false);
     }
   }
@@ -64,7 +79,7 @@ async function handlePay() {
       try {
         await checkMomoPaymentStatus({ referenceId, tripId });
         // paymentStatus prop updates via the live trip listener in the parent;
-        // the effect above stops polling once it reaches a terminal state.
+        // the effect above stops polling and toasts once it reaches a terminal state.
       } catch {
         // keep polling silently on transient errors
       }
@@ -96,8 +111,11 @@ async function handlePay() {
       <button
         onClick={handlePay}
         disabled={isPending}
-        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700"
+        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700 flex items-center justify-center gap-2"
       >
+        {isPending && (
+          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        )}
         {isPending ? "Waiting..." : "Pay now"}
       </button>
     </div>

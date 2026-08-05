@@ -22,6 +22,8 @@ export default function ServicePage() {
             src={service.img}
             alt={service.name}
             className="w-full h-64 md:h-96 object-cover rounded-2xl"
+            loading="eager"
+            decoding="async"
           />
         </div>
         <div>

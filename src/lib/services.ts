@@ -1,8 +1,8 @@
 ﻿import furnitureImg from "../assets/truck-loading.jpg";
-import motorbikeImg from "../assets/track-driver.jpg";
+import taxiImg from "../assets/track-driver.jpg";
 import carImg from "../assets/rental-cars.jpg";
 import vanImg from "../assets/truck-park.jpg";
-import ebayImg from "../assets/track.jpg";
+import parcelImg from "../assets/track.jpg";
 import fragileImg from "../assets/fragile-service.jpg";
 import boatImg from "../assets/boat-lake-kivu.jpg";
 import removalsImg from "../assets/KIGALI (1).jpg";
@@ -20,55 +20,55 @@ export const services: ServiceInfo[] = [
     name: "Furniture Delivery",
     img: furnitureImg,
     description:
-      "Get competitive quotes from trusted movers for sofas, wardrobes, and full furniture sets, delivered safely to your new home or office.",
+      "Book a verified driver to move sofas, wardrobes, and furniture sets safely to your new home or office in Kigali.",
   },
   {
-    slug: "motorbike-transport",
-    name: "Motorbike Transport",
-    img: motorbikeImg,
+    slug: "passenger-taxi",
+    name: "Passenger Taxi Ride",
+    img: taxiImg,
     description:
-      "Move your motorbike locally or across the country with experienced transporters who handle two-wheelers with care.",
+      "Get a nearby taxi in minutes for a fast, affordable ride anywhere in Kigali \u2014 live tracked from pickup to drop-off.",
   },
   {
     slug: "car-transport",
-    name: "Car Transport",
+    name: "VIP Car Ride",
     img: carImg,
     description:
-      "Ship your car door-to-door with vetted car transport providers, whether you're relocating or buying/selling remotely.",
+      "Prefer more comfort? Book a VIP taxi for extra space, with the same live tracking and Mobile Money payment.",
   },
   {
     slug: "man-and-van",
-    name: "Man And Van",
+    name: "Truck & Van Delivery",
     img: vanImg,
     description:
-      "Flexible man-and-van help for small moves, single items, or quick local jobs at a fraction of standard removal costs.",
+      "Flexible truck and van delivery for small moves, market goods, or bulky items at fair, distance-based RWF pricing.",
   },
   {
-    slug: "ebay-deliveries",
-    name: "eBay Deliveries",
-    img: ebayImg,
+    slug: "parcel-delivery",
+    name: "Parcel & Package Delivery",
+    img: parcelImg,
     description:
-      "TikTak is an official eBay-compatible delivery service. Get your eBay purchase collected and delivered fast.",
+      "Send documents and packages across Kigali with real-time tracking, from your door to theirs.",
   },
   {
     slug: "fragile-item-transport",
     name: "Fragile Item Transport",
     img: fragileImg,
     description:
-      "Specialist handling for fragile, delicate, or high-value items, from glassware to electronics and artwork.",
+      "Careful handling for delicate or high-value items, from electronics to glassware, by drivers who know how to keep them safe.",
   },
   {
     slug: "boat-transport",
-    name: "Boat Transport",
+    name: "Lake Kivu Transport",
     img: boatImg,
     description:
-      "Transport boats and watercraft of all sizes with providers experienced in marine logistics and safe loading.",
+      "Coordinate transport to and from Lake Kivu and other regional destinations with drivers experienced in longer trips.",
   },
   {
     slug: "removals",
-    name: "Removals",
+    name: "Home & Office Removals",
     img: removalsImg,
     description:
-      "Full home or office removals, from a single room to a complete move, handled by rated removal companies near you.",
+      "Full home or office moves in Kigali, from a single room to a complete relocation, handled by rated local drivers.",
   },
 ];
