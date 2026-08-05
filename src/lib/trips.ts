@@ -1,4 +1,4 @@
-import { ref, onValue, update, runTransaction, query, orderByChild, startAt, endAt } from "firebase/database";
+﻿import { ref, onValue, update, runTransaction, query, orderByChild, startAt, endAt } from "firebase/database";
 import { geohashQueryBounds, distanceBetween } from "geofire-common";
 import { db, app } from "../firebase";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -92,20 +92,15 @@ export async function acceptTrip(tripId: string, driverId: string): Promise<bool
   try {
     const result = await runTransaction(tripRef, (current) => {
       if (current === null) {
-        console.log("[acceptTrip] node is null, aborting");
         return current;
       }
-      console.log("[acceptTrip] current status:", current.status, "driverId:", current.driverId, "trying driverId:", driverId);
       if (current.status !== "requested") {
-        console.log("[acceptTrip] not requested anymore, aborting");
         return undefined;
       }
       current.status = "accepted";
       current.driverId = driverId;
       return current;
     });
-
-    console.log("[acceptTrip] committed:", result.committed, "final value:", result.snapshot.val());
     return result.committed;
   } catch (err) {
     console.error("[acceptTrip] transaction threw:", err);
