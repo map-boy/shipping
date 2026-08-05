@@ -1,11 +1,11 @@
 ﻿import { useState, useMemo } from "react";
-import { createTripRequest, listenToTrip, updateTripStatus, type TripRequest, type TripType } from "../lib/trips";
+import type { TripType } from "../lib/trips";
 import type { VehicleType } from "../lib/drivers";
 import { estimateFare } from "../lib/fare";
 import { auth } from "../firebase";
-import PaymentButton from "./PaymentButton";
 import type { GeocodeResult } from "../lib/geocode";
 import { useToast } from "./Toast";
+import { useCart } from "./Cart";
 
 const VEHICLES: { value: VehicleType; label: string }[] = [
   { value: "standard", label: "Standard" },
@@ -16,19 +16,17 @@ const VEHICLES: { value: VehicleType; label: string }[] = [
 interface Props {
   userLocation: [number, number] | null;
   destination: GeocodeResult | null;
-  onTripChange?: (trip: TripRequest | null) => void;
   preselectedVehicle?: VehicleType | null;
 }
 
-export default function BookingForm({ userLocation, destination, onTripChange, preselectedVehicle }: Props) {
+export default function BookingForm({ userLocation, destination, preselectedVehicle }: Props) {
   const { showToast } = useToast();
+  const { addToCart } = useCart();
   const [tripType, setTripType] = useState<TripType>("person");
   const [vehicleType, setVehicleType] = useState<VehicleType>(preselectedVehicle || "standard");
   const [goodsDescription, setGoodsDescription] = useState("");
-  const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [requesting, setRequesting] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const rideOptions = useMemo(() => {
     if (!userLocation || !destination) return null;
@@ -45,33 +43,7 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
     return estimateFare({ lat, lng }, { lat: destination.lat, lng: destination.lng }, vehicleType);
   }, [userLocation, destination, vehicleType]);
 
-  const [justCompleted, setJustCompleted] = useState(false);
-
-  function updateTrip(trip: TripRequest | null) {
-    if (!trip && activeTrip && (activeTrip.status === "accepted" || activeTrip.status === "in_progress")) {
-      setJustCompleted(true);
-      showToast("Trip completed! Thank you for riding with us.", "success");
-      setTimeout(() => setJustCompleted(false), 6000);
-    }
-    setActiveTrip(trip);
-    onTripChange?.(trip);
-  }
-
-  async function handleCancel() {
-    if (!activeTrip) return;
-    setCancelling(true);
-    try {
-      await updateTripStatus(activeTrip.id, "cancelled");
-      showToast("Ride request cancelled.", "info");
-      updateTrip(null);
-    } catch (err) {
-      showToast("Could not cancel the ride. Please try again.", "error");
-    } finally {
-      setCancelling(false);
-    }
-  }
-
-  async function handleRequest() {
+  function handleAddToCart() {
     setError(null);
     if (!userLocation) {
       setError("Waiting for your location...");
@@ -88,82 +60,26 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
       showToast("Please log in first.", "error");
       return;
     }
+    if (!estimate) return;
 
-    setRequesting(true);
+    setAdding(true);
     try {
       const [lng, lat] = userLocation;
-      const tripId = await createTripRequest(
-        auth.currentUser.uid,
+      addToCart({
         tripType,
         vehicleType,
-        { lat, lng },
-        { lat: destination.lat, lng: destination.lng },
-        tripType === "goods" ? goodsDescription : undefined
-      );
-      listenToTrip(tripId, updateTrip);
-      showToast(tripType === "person" ? "Ride requested! Looking for a driver..." : "Delivery requested! Looking for a driver...", "success");
-    } catch (err) {
-      const message = "Failed to create trip: " + (err instanceof Error ? err.message : String(err));
-      setError(message);
-      showToast("Failed to request the ride. Please try again.", "error");
+        pickup: { lat, lng },
+        destination: { lat: destination.lat, lng: destination.lng },
+        destinationName: destination.name,
+        goodsDescription: tripType === "goods" ? goodsDescription : undefined,
+        distanceKm: estimate.distanceKm,
+        price: estimate.price,
+      });
+      showToast(tripType === "person" ? "Ride added to cart." : "Delivery added to cart.", "success");
+      setGoodsDescription("");
     } finally {
-      setRequesting(false);
+      setAdding(false);
     }
-  }
-
-  if (justCompleted) {
-    return (
-      <div className="space-y-3 text-center py-4">
-        <div className="text-4xl">&#9989;</div>
-        <p className="text-lg font-bold text-green-700">Trip completed!</p>
-        <p className="text-sm text-gray-500">Thank you for riding with us.</p>
-      </div>
-    );
-  }
-
-  if (activeTrip) {
-    const statusBoxClass =
-      activeTrip.status === "accepted"
-        ? "bg-green-50 text-green-700"
-        : activeTrip.status === "in_progress"
-        ? "bg-blue-50 text-blue-700"
-        : "bg-amber-50 text-amber-700";
-
-    const statusText =
-      activeTrip.status === "requested"
-        ? "Looking for a nearby driver..."
-        : activeTrip.status === "accepted"
-        ? "Driver accepted! On the way to you."
-        : activeTrip.status === "in_progress"
-        ? "Trip in progress"
-        : activeTrip.status;
-
-    return (
-      <div className="space-y-3">
-        <div className={`rounded-lg px-4 py-3 text-center font-bold text-base ${statusBoxClass}`}>
-          {statusText}
-        </div>
-        <p className="text-sm text-gray-600 text-center">{activeTrip.distanceKm} km &middot; {activeTrip.price} RWF</p>
-        {activeTrip.driverId && (activeTrip.status === "accepted" || activeTrip.status === "in_progress") && (
-          <p className="text-sm text-gray-500 text-center">Your driver's location is shown live on the map above.</p>
-        )}
-        {activeTrip.status === "requested" && (
-          <button
-            onClick={handleCancel}
-            disabled={cancelling}
-            className="w-full bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {cancelling && (
-              <span className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
-            )}
-            {cancelling ? "Cancelling..." : "Cancel request"}
-          </button>
-        )}
-        {(activeTrip.status === "accepted" || activeTrip.status === "in_progress") && (
-          <PaymentButton tripId={activeTrip.id} amount={activeTrip.price} paymentStatus={activeTrip.paymentStatus} />
-        )}
-      </div>
-    );
   }
 
   return (
@@ -239,17 +155,17 @@ export default function BookingForm({ userLocation, destination, onTripChange, p
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <button
-        onClick={handleRequest}
-        disabled={!estimate || requesting}
+        onClick={handleAddToCart}
+        disabled={!estimate || adding}
         className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700 flex items-center justify-center gap-2"
       >
-        {requesting && (
+        {adding && (
           <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
         )}
-        {requesting
-          ? "Requesting..."
+        {adding
+          ? "Adding..."
           : estimate
-          ? `Request ${tripType === "person" ? "ride" : "delivery"} \u00b7 ${estimate.price} RWF`
+          ? `Add to cart \u00b7 ${estimate.price} RWF`
           : `Choose a destination to see price`}
       </button>
     </div>

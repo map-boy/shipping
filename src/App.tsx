@@ -7,11 +7,13 @@ import Home from "./components/Home";
 import Footer from "./components/Footer";
 import AuthModal from "./components/AuthModal";
 import { ToastProvider } from "./components/Toast";
+import { CartProvider } from "./components/Cart";
 
 const RidePage = lazy(() => import("./components/RidePage"));
 const DriverPage = lazy(() => import("./components/DriverPage"));
 const Profile = lazy(() => import("./components/Profile"));
 const ServicePage = lazy(() => import("./components/ServicePage"));
+const CartPage = lazy(() => import("./components/CartPage"));
 
 function RouteLoading() {
   return (
@@ -32,25 +34,28 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <BrowserRouter>
-        <div className="min-h-screen bg-white">
-          <Navbar
-            user={user}
-            onLoginClick={() => setShowAuth(true)}
-          />
-          <Suspense fallback={<RouteLoading />}>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/ride" element={<RidePage />} />
-              <Route path="/driver" element={<DriverPage />} />
-              <Route path="/profile" element={<Profile user={user} onLogoutClick={() => signOut(auth)} />} />
-              <Route path="/services/:slug" element={<ServicePage />} />
-            </Routes>
-          </Suspense>
-          <Footer />
-          {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
-        </div>
-      </BrowserRouter>
+      <CartProvider>
+        <BrowserRouter>
+          <div className="min-h-screen bg-white">
+            <Navbar
+              user={user}
+              onLoginClick={() => setShowAuth(true)}
+            />
+            <Suspense fallback={<RouteLoading />}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/ride" element={<RidePage />} />
+                <Route path="/driver" element={<DriverPage />} />
+                <Route path="/profile" element={<Profile user={user} onLogoutClick={() => signOut(auth)} />} />
+                <Route path="/services/:slug" element={<ServicePage />} />
+                <Route path="/cart" element={<CartPage />} />
+              </Routes>
+            </Suspense>
+            <Footer />
+            {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+          </div>
+        </BrowserRouter>
+      </CartProvider>
     </ToastProvider>
   );
 }

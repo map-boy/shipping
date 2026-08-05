@@ -1,0 +1,3668 @@
+﻿===== src\App.tsx =====
+import { useState, useEffect, Suspense, lazy } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { auth } from "./firebase";
+import Navbar from "./components/Navbar";
+import Home from "./components/Home";
+import Footer from "./components/Footer";
+import AuthModal from "./components/AuthModal";
+import { ToastProvider } from "./components/Toast";
+import { CartProvider } from "./components/Cart";
+
+const RidePage = lazy(() => import("./components/RidePage"));
+const DriverPage = lazy(() => import("./components/DriverPage"));
+const Profile = lazy(() => import("./components/Profile"));
+const ServicePage = lazy(() => import("./components/ServicePage"));
+const CartPage = lazy(() => import("./components/CartPage"));
+
+function RouteLoading() {
+  return (
+    <div className="w-full h-[60vh] flex items-center justify-center">
+      <span className="w-8 h-8 border-4 border-cta border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return unsub;
+  }, []);
+
+  return (
+    <ToastProvider>
+      <CartProvider>
+        <BrowserRouter>
+          <div className="min-h-screen bg-white">
+            <Navbar
+              user={user}
+              onLoginClick={() => setShowAuth(true)}
+            />
+            <Suspense fallback={<RouteLoading />}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/ride" element={<RidePage />} />
+                <Route path="/driver" element={<DriverPage />} />
+                <Route path="/profile" element={<Profile user={user} onLogoutClick={() => signOut(auth)} />} />
+                <Route path="/services/:slug" element={<ServicePage />} />
+                <Route path="/cart" element={<CartPage />} />
+              </Routes>
+            </Suspense>
+            <Footer />
+            {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+          </div>
+        </BrowserRouter>
+      </CartProvider>
+    </ToastProvider>
+  );
+}
+
+===== src\components\About.tsx =====
+import aboutImg from "../assets/about-photo.jpg";
+import Reveal from "./Reveal";
+
+export default function About() {
+  return (
+    <section id="about" className="relative mt-20">
+      <div className="max-w-7xl mx-auto bg-gradient-to-b from-slate-100 rounded-tl-[100px] px-4 sm:px-6 pt-12 md:pt-20 pb-12">
+        <Reveal>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 md:mb-8 text-center md:text-left">
+            More about TikTak Rwanda
+          </h2>
+        </Reveal>
+        <div className="flex flex-col md:flex-row items-center gap-8">
+          <Reveal className="w-full md:w-2/3">
+            <p className="text-lg text-slate-500 text-justify">
+              TikTak Rwanda connects passengers and senders with nearby taxi
+              drivers across Kigali and beyond. Request a ride or a delivery, see
+              real-time prices in RWF, and track your driver live on the map from
+              pickup to drop-off. Every driver on the platform is verified and rated,
+              so you always know who's picking you up. Whether you're heading across
+              town or sending a parcel to a friend, TikTak makes it fast, safe, and
+              affordable &mdash; with payment by Mobile Money or cash.
+            </p>
+          </Reveal>
+          <Reveal className="w-full md:w-1/3" delayMs={150}>
+            <img src={aboutImg} alt="TikTak Rwanda taxi driver" className="w-full h-auto rounded-xl shadow-lg transition hover:shadow-2xl duration-300" loading="lazy" decoding="async" width="600" height="450" />
+          </Reveal>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+===== src\components\AddressSearch.tsx =====
+import { useState, useRef, useEffect } from "react";
+import { searchPlaces, type GeocodeResult } from "../lib/geocode";
+
+interface Props {
+  placeholder: string;
+  onSelect: (place: GeocodeResult) => void;
+}
+
+export default function AddressSearch({ placeholder, onSelect }: Props) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<GeocodeResult[]>([]);
+  const [open, setOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      const places = await searchPlaces(query);
+      setResults(places);
+      setOpen(true);
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [query]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function handleSelect(place: GeocodeResult) {
+    setQuery(place.name);
+    setOpen(false);
+    onSelect(place);
+  }
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onFocus={() => results.length > 0 && setOpen(true)}
+        className="w-full border rounded-lg px-3 py-3 text-base"
+      />
+      {open && results.length > 0 && (
+        <ul className="absolute z-10 w-full bg-white border rounded mt-1 shadow-lg max-h-60 overflow-y-auto">
+          {results.map((place, i) => (
+            <li
+              key={i}
+              onClick={() => handleSelect(place)}
+              className="px-4 py-3 text-sm active:bg-gray-100 cursor-pointer min-h-[44px] flex items-center"
+            >
+              {place.name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+
+===== src\components\AuthModal.tsx =====
+import { useState } from "react";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+} from "firebase/auth";
+import { auth } from "../firebase";
+
+const googleProvider = new GoogleAuthProvider();
+
+interface AuthModalProps {
+  onClose: () => void;
+}
+
+export default function AuthModal({ onClose }: AuthModalProps) {
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleEmailAuth(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      if (mode === "login") {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+      }
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleAuth() {
+    setError("");
+    setLoading(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+          aria-label="Close"
+        >
+          ?
+        </button>
+
+        <h2 className="text-xl font-bold text-gray-900 mb-6">
+          {mode === "login" ? "Log in" : "Sign up"}
+        </h2>
+
+        {error && (
+          <div className="bg-red-50 text-red-600 text-sm rounded-lg px-3 py-2 mb-4">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleEmailAuth} className="space-y-3">
+          <input
+            type="email"
+            required
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-700"
+          />
+          <input
+            type="password"
+            required
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-700"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-cta hover:bg-ctaHover text-white font-semibold py-3.5 text-base rounded-lg transition disabled:opacity-50"
+          >
+            {loading ? "Please wait..." : mode === "login" ? "Log in" : "Sign up"}
+          </button>
+        </form>
+
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400">OR</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        <button
+          onClick={handleGoogleAuth}
+          disabled={loading}
+          className="w-full border border-gray-300 rounded-lg py-3.5 text-base font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+        >
+          Continue with Google
+        </button>
+
+        <p className="text-sm text-gray-500 text-center mt-5">
+          {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
+          <button
+            type="button"
+            onClick={() => setMode(mode === "login" ? "signup" : "login")}
+            className="text-cta font-medium hover:underline"
+          >
+            {mode === "login" ? "Sign up" : "Log in"}
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+
+
+===== src\components\BookingForm.tsx =====
+import { useState, useMemo } from "react";
+import { updateTripStatus, type TripRequest, type TripType } from "../lib/trips";
+import type { VehicleType } from "../lib/drivers";
+import { estimateFare } from "../lib/fare";
+import { auth } from "../firebase";
+import PaymentButton from "./PaymentButton";
+import type { GeocodeResult } from "../lib/geocode";
+import { useToast } from "./Toast";
+import { useCart } from "./Cart";
+
+const VEHICLES: { value: VehicleType; label: string }[] = [
+  { value: "standard", label: "Standard" },
+  { value: "truck", label: "Truck" },
+  { value: "vip", label: "VIP" },
+];
+
+interface Props {
+  userLocation: [number, number] | null;
+  destination: GeocodeResult | null;
+  onTripChange?: (trip: TripRequest | null) => void;
+  preselectedVehicle?: VehicleType | null;
+}
+
+export default function BookingForm({ userLocation, destination, onTripChange, preselectedVehicle }: Props) {
+  const { showToast } = useToast();
+  const { addToCart } = useCart();
+  const [tripType, setTripType] = useState<TripType>("person");
+  const [vehicleType, setVehicleType] = useState<VehicleType>(preselectedVehicle || "standard");
+  const [goodsDescription, setGoodsDescription] = useState("");
+  const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  const rideOptions = useMemo(() => {
+    if (!userLocation || !destination) return null;
+    const [lng, lat] = userLocation;
+    return VEHICLES.map((v) => ({
+      ...v,
+      estimate: estimateFare({ lat, lng }, { lat: destination.lat, lng: destination.lng }, v.value),
+    }));
+  }, [userLocation, destination]);
+
+  const estimate = useMemo(() => {
+    if (!userLocation || !destination) return null;
+    const [lng, lat] = userLocation;
+    return estimateFare({ lat, lng }, { lat: destination.lat, lng: destination.lng }, vehicleType);
+  }, [userLocation, destination, vehicleType]);
+
+  const [justCompleted, setJustCompleted] = useState(false);
+
+  function updateTrip(trip: TripRequest | null) {
+    if (!trip && activeTrip && (activeTrip.status === "accepted" || activeTrip.status === "in_progress")) {
+      setJustCompleted(true);
+      showToast("Trip completed! Thank you for riding with us.", "success");
+      setTimeout(() => setJustCompleted(false), 6000);
+    }
+    setActiveTrip(trip);
+    onTripChange?.(trip);
+  }
+
+  async function handleCancel() {
+    if (!activeTrip) return;
+    setCancelling(true);
+    try {
+      await updateTripStatus(activeTrip.id, "cancelled");
+      showToast("Ride request cancelled.", "info");
+      updateTrip(null);
+    } catch (err) {
+      showToast("Could not cancel the ride. Please try again.", "error");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  function handleAddToCart() {
+    setError(null);
+    if (!userLocation) {
+      setError("Waiting for your location...");
+      showToast("Waiting for your location...", "error");
+      return;
+    }
+    if (!destination) {
+      setError("Please choose your destination on the map first.");
+      showToast("Please choose your destination first.", "error");
+      return;
+    }
+    if (!auth.currentUser) {
+      setError("Please log in first.");
+      showToast("Please log in first.", "error");
+      return;
+    }
+    if (!estimate) return;
+
+    setAdding(true);
+    try {
+      const [lng, lat] = userLocation;
+      addToCart({
+        tripType,
+        vehicleType,
+        pickup: { lat, lng },
+        destination: { lat: destination.lat, lng: destination.lng },
+        destinationName: destination.name,
+        goodsDescription: tripType === "goods" ? goodsDescription : undefined,
+        distanceKm: estimate.distanceKm,
+        price: estimate.price,
+      });
+      showToast(tripType === "person" ? "Ride added to cart." : "Delivery added to cart.", "success");
+      setGoodsDescription("");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  if (justCompleted) {
+    return (
+      <div className="space-y-3 text-center py-4">
+        <div className="text-4xl">&#9989;</div>
+        <p className="text-lg font-bold text-green-700">Trip completed!</p>
+        <p className="text-sm text-gray-500">Thank you for riding with us.</p>
+      </div>
+    );
+  }
+
+  if (activeTrip) {
+    const statusBoxClass =
+      activeTrip.status === "accepted"
+        ? "bg-green-50 text-green-700"
+        : activeTrip.status === "in_progress"
+        ? "bg-blue-50 text-blue-700"
+        : "bg-amber-50 text-amber-700";
+
+    const statusText =
+      activeTrip.status === "requested"
+        ? "Looking for a nearby driver..."
+        : activeTrip.status === "accepted"
+        ? "Driver accepted! On the way to you."
+        : activeTrip.status === "in_progress"
+        ? "Trip in progress"
+        : activeTrip.status;
+
+    return (
+      <div className="space-y-3">
+        <div className={`rounded-lg px-4 py-3 text-center font-bold text-base ${statusBoxClass}`}>
+          {statusText}
+        </div>
+        <p className="text-sm text-gray-600 text-center">{activeTrip.distanceKm} km &middot; {activeTrip.price} RWF</p>
+        {activeTrip.driverId && (activeTrip.status === "accepted" || activeTrip.status === "in_progress") && (
+          <p className="text-sm text-gray-500 text-center">Your driver's location is shown live on the map above.</p>
+        )}
+        {activeTrip.status === "requested" && (
+          <button
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="w-full bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {cancelling && (
+              <span className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+            )}
+            {cancelling ? "Cancelling..." : "Cancel request"}
+          </button>
+        )}
+        {(activeTrip.status === "accepted" || activeTrip.status === "in_progress") && (
+          <PaymentButton tripId={activeTrip.id} amount={activeTrip.price} paymentStatus={activeTrip.paymentStatus} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <button
+          onClick={() => setTripType("person")}
+          className={`px-4 py-3 rounded-lg text-base font-medium min-h-[44px] ${tripType === "person" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+        >
+          People
+        </button>
+        <button
+          onClick={() => setTripType("goods")}
+          className={`px-4 py-3 rounded-lg text-base font-medium min-h-[44px] ${tripType === "goods" ? "bg-blue-600 text-white" : "bg-gray-100"}`}
+        >
+          Goods
+        </button>
+      </div>
+
+      {tripType === "goods" && (
+        <input
+          type="text"
+          placeholder="Describe the goods (e.g. furniture, fragile items)"
+          value={goodsDescription}
+          onChange={(e) => setGoodsDescription(e.target.value)}
+          className="w-full border rounded-lg px-3 py-3 text-base"
+        />
+      )}
+
+      {!destination && (
+        <p className="text-sm text-gray-500">Search your destination on the map above to see prices.</p>
+      )}
+      {destination && (
+        <p className="text-sm text-gray-500">Destination: {destination.name}</p>
+      )}
+
+      {rideOptions ? (
+        <div className="space-y-2">
+          {rideOptions.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setVehicleType(opt.value)}
+              className={`w-full flex items-center justify-between border rounded-lg px-3 py-3 text-left min-h-[44px] ${
+                vehicleType === opt.value ? "border-blue-600 bg-blue-50" : "border-gray-200"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span>
+                  <span className="block font-medium">{opt.label}</span>
+                  <span className="block text-xs text-gray-500">{opt.estimate.distanceKm} km</span>
+                </span>
+              </span>
+              <span className="font-medium">{opt.estimate.price} RWF</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {VEHICLES.map((v) => (
+            <button
+              key={v.value}
+              onClick={() => setVehicleType(v.value)}
+              className={`w-full flex items-center gap-2 border rounded-lg px-3 py-3 text-left min-h-[44px] ${
+                vehicleType === v.value ? "border-blue-600 bg-blue-50" : "border-gray-200"
+              }`}
+            >
+              <span className="font-medium">{v.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+
+      <button
+        onClick={handleAddToCart}
+        disabled={!estimate || adding}
+        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700 flex items-center justify-center gap-2"
+      >
+        {adding && (
+          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        )}
+        {adding
+          ? "Adding..."
+          : estimate
+          ? `Add to cart \u00b7 ${estimate.price} RWF`
+          : `Choose a destination to see price`}
+      </button>
+    </div>
+  );
+}
+
+===== src\components\Cart.tsx =====
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import type { TripType } from "../lib/trips";
+import type { VehicleType } from "../lib/drivers";
+
+export interface CartItem {
+  id: string;
+  tripType: TripType;
+  vehicleType: VehicleType;
+  pickup: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
+  destinationName: string;
+  goodsDescription?: string;
+  distanceKm: number;
+  price: number;
+  addedAt: number;
+}
+
+interface CartContextValue {
+  items: CartItem[];
+  addToCart: (item: Omit<CartItem, "id" | "addedAt">) => void;
+  removeFromCart: (id: string) => void;
+  clearCart: () => void;
+  itemCount: number;
+  totalPrice: number;
+}
+
+const CartContext = createContext<CartContextValue | null>(null);
+const STORAGE_KEY = "tiktak-cart";
+
+export function CartProvider({ children }: { children: ReactNode }) {
+  const [items, setItems] = useState<CartItem[]>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    } catch {
+      // storage unavailable, ignore
+    }
+  }, [items]);
+
+  function addToCart(item: Omit<CartItem, "id" | "addedAt">) {
+    const newItem: CartItem = {
+      ...item,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      addedAt: Date.now(),
+    };
+    setItems((prev) => [...prev, newItem]);
+  }
+
+  function removeFromCart(id: string) {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+  }
+
+  function clearCart() {
+    setItems([]);
+  }
+
+  const itemCount = items.length;
+  const totalPrice = items.reduce((sum, i) => sum + i.price, 0);
+
+  return (
+    <CartContext.Provider value={{ items, addToCart, removeFromCart, clearCart, itemCount, totalPrice }}>
+      {children}
+    </CartContext.Provider>
+  );
+}
+
+export function useCart() {
+  const ctx = useContext(CartContext);
+  if (!ctx) throw new Error("useCart must be used within a CartProvider");
+  return ctx;
+}
+
+===== src\components\CartPage.tsx =====
+import { Link, useNavigate } from "react-router-dom";
+import { useCart } from "./Cart";
+
+export default function CartPage() {
+  const { items, removeFromCart, clearCart, totalPrice } = useCart();
+  const navigate = useNavigate();
+
+  if (items.length === 0) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <h1 className="text-2xl font-semibold mb-3">Your cart is empty</h1>
+        <p className="text-gray-500 mb-6">Add a ride or goods request to get started.</p>
+        <Link to="/ride" className="inline-block bg-cta text-white px-6 py-3 rounded-xl font-medium">
+          Book a ride
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-10">
+      <h1 className="text-2xl font-semibold mb-6">Your cart</h1>
+
+      <div className="space-y-4">
+        {items.map((item) => (
+          <div key={item.id} className="border rounded-2xl p-4 flex justify-between items-start">
+            <div>
+              <p className="font-medium capitalize">
+                {item.tripType} · {item.vehicleType}
+              </p>
+              <p className="text-sm text-gray-500">{item.destinationName}</p>
+              {item.goodsDescription && (
+                <p className="text-sm text-gray-500">Goods: {item.goodsDescription}</p>
+              )}
+              <p className="text-sm text-gray-400">{item.distanceKm.toFixed(1)} km</p>
+            </div>
+            <div className="text-right">
+              <p className="font-semibold">{item.price.toLocaleString()} RWF</p>
+              <button
+                onClick={() => removeFromCart(item.id)}
+                className="text-sm text-red-500 mt-2"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-between items-center mt-8 border-t pt-4">
+        <span className="text-lg font-semibold">Total</span>
+        <span className="text-lg font-semibold">{totalPrice.toLocaleString()} RWF</span>
+      </div>
+
+      <div className="flex gap-3 mt-6">
+        <button
+          onClick={() => clearCart()}
+          className="flex-1 border rounded-xl py-3 font-medium"
+        >
+          Clear cart
+        </button>
+        <button
+          onClick={() => {
+            navigate("/checkout");
+          }}
+          className="flex-1 bg-cta text-white rounded-xl py-3 font-medium"
+        >
+          Checkout
+        </button>
+      </div>
+    </div>
+  );
+}
+
+===== src\components\CountrySelector.tsx =====
+import { Link } from "react-router-dom";
+
+const countries = ["Australia", "Canada", "France", "Germany", "India", "Italy", "Brazil", "Mexico", "Spain", "United Kingdom", "USA"];
+
+export default function CountrySelector() {
+  return (
+    <section className="pb-20 text-center max-w-7xl mx-auto px-4 sm:px-6">
+      <ul className="flex flex-wrap justify-center gap-4">
+        {countries.map((c) => (
+          <li key={c}>
+            <Link to="/ride" className="flex items-center gap-2 group">
+              <span className="w-4 h-3 bg-gray-300 rounded-sm inline-block" />
+              <span className="text-gray-500 group-hover:text-heroTo transition duration-150 ease-in-out">
+                {c}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+
+===== src\components\CTABanner.tsx =====
+import { Link } from "react-router-dom";
+import Reveal from "./Reveal";
+
+export default function CTABanner() {
+  return (
+    <section className="relative bg-slate-800 overflow-hidden">
+      <div className="pointer-events-none absolute -bottom-16 -left-16 w-72 h-72 rounded-full bg-cta/10 blur-3xl" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-20 relative">
+        <Reveal>
+          <div className="sm:flex sm:flex-col lg:flex-row justify-between items-center gap-6">
+            <div className="text-center lg:text-left">
+              <h2 className="text-3xl font-bold text-slate-100">
+                Have a vehicle? Drive with TikTak Rwanda.
+              </h2>
+              <p className="mt-2 text-slate-400">Earn on your own schedule across Kigali.</p>
+            </div>
+            <div>
+              <Link to="/driver" className="inline-flex items-center text-blue-50 bg-blue-500 hover:bg-blue-600 font-semibold px-5 py-2.5 rounded-full transition shadow-sm hover:shadow-lg hover:scale-105">
+                Drive with TikTak
+                <span className="ml-2">-&gt;</span>
+              </Link>
+            </div>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+
+===== src\components\DriverMap.tsx =====
+import { useEffect, useRef, useState } from "react";
+import { loadGoogleMaps } from "../lib/googleMapsLoader";
+import { reverseGeocode } from "../lib/geocode";
+import { fetchRoute } from "../lib/directions";
+import type { TripRequest } from "../lib/trips";
+
+interface Props {
+  driverPos: { lat: number; lng: number } | null;
+  openTrips: TripRequest[];
+  activeTrip: TripRequest | null;
+  onAccept: (tripId: string) => void;
+  fullScreen?: boolean;
+}
+
+export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept, fullScreen }: Props) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<google.maps.Map | null>(null);
+  const googleRef = useRef<typeof google | null>(null);
+  const driverMarkerRef = useRef<google.maps.Marker | null>(null);
+  const tripMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const tripInfoWindowsRef = useRef<Map<string, google.maps.InfoWindow>>(new Map());
+  const activePickupMarkerRef = useRef<google.maps.Marker | null>(null);
+  const activeDestMarkerRef = useRef<google.maps.Marker | null>(null);
+  const routeLineRef = useRef<google.maps.Polyline | null>(null);
+  const [ready, setReady] = useState(false);
+  const [etaMin, setEtaMin] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+    loadGoogleMaps().then((google) => {
+      googleRef.current = google;
+      map.current = new google.maps.Map(mapContainer.current!, {
+        center: driverPos ?? { lat: -1.9441, lng: 30.0619 },
+        zoom: 13,
+        streetViewControl: false,
+        mapTypeControl: false,
+      });
+      setReady(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    const google = googleRef.current;
+    if (!ready || !google || !map.current || !driverPos) return;
+
+    if (!driverMarkerRef.current) {
+      driverMarkerRef.current = new google.maps.Marker({
+        position: driverPos,
+        map: map.current,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: "#111827",
+          fillOpacity: 1,
+          strokeColor: "white",
+          strokeWeight: 2,
+        },
+        zIndex: 999,
+      });
+      map.current.setCenter(driverPos);
+    } else {
+      driverMarkerRef.current.setPosition(driverPos);
+    }
+  }, [ready, driverPos]);
+
+  useEffect(() => {
+    const google = googleRef.current;
+    if (!ready || !google || !map.current) return;
+
+    if (activeTrip) {
+      tripMarkersRef.current.forEach((m) => m.setMap(null));
+      tripMarkersRef.current.clear();
+      tripInfoWindowsRef.current.forEach((iw) => iw.close());
+      tripInfoWindowsRef.current.clear();
+      return;
+    }
+
+    const currentIds = new Set(openTrips.map((t) => t.id));
+    tripMarkersRef.current.forEach((marker, id) => {
+      if (!currentIds.has(id)) {
+        marker.setMap(null);
+        tripMarkersRef.current.delete(id);
+        tripInfoWindowsRef.current.get(id)?.close();
+        tripInfoWindowsRef.current.delete(id);
+      }
+    });
+
+    openTrips.forEach((trip) => {
+      if (tripMarkersRef.current.has(trip.id)) return;
+
+      const marker = new google.maps.Marker({
+        position: trip.pickup,
+        map: map.current!,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: "#2563eb",
+          fillOpacity: 1,
+          strokeColor: "white",
+          strokeWeight: 2,
+        },
+        animation: google.maps.Animation.DROP,
+      });
+
+      const infoWindow = new google.maps.InfoWindow({
+        content: `<div style="font-size:13px;min-width:180px;">
+          <div style="font-weight:600;margin-bottom:4px;">${trip.tripType === "person" ? "Passenger" : "Goods delivery"}</div>
+          <div style="color:#6b7280;margin-bottom:6px;">Loading address...</div>
+          <div style="color:#6b7280;margin-bottom:6px;">${trip.distanceKm} km &middot; ${trip.price} RWF</div>
+          <button id="accept-${trip.id}" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;width:100%;min-height:44px;">Accept</button>
+        </div>`,
+      });
+
+      marker.addListener("click", () => {
+        infoWindow.open({ map: map.current!, anchor: marker });
+        reverseGeocode(trip.pickup.lat, trip.pickup.lng).then((address) => {
+          const el = infoWindow.getContent();
+          if (typeof el !== "string") return;
+          infoWindow.setContent(el.replace("Loading address...", address));
+        });
+      });
+
+      infoWindow.addListener("domready", () => {
+        document.getElementById(`accept-${trip.id}`)?.addEventListener("click", () => {
+          onAccept(trip.id);
+          infoWindow.close();
+        });
+      });
+
+      tripMarkersRef.current.set(trip.id, marker);
+      tripInfoWindowsRef.current.set(trip.id, infoWindow);
+    });
+  }, [ready, openTrips, activeTrip, onAccept]);
+
+  useEffect(() => {
+    const google = googleRef.current;
+    if (!ready || !google || !map.current) return;
+
+    activePickupMarkerRef.current?.setMap(null);
+    activePickupMarkerRef.current = null;
+    activeDestMarkerRef.current?.setMap(null);
+    activeDestMarkerRef.current = null;
+    routeLineRef.current?.setMap(null);
+    routeLineRef.current = null;
+    setEtaMin(null);
+
+    if (!activeTrip) return;
+
+    activePickupMarkerRef.current = new google.maps.Marker({
+      position: activeTrip.pickup,
+      map: map.current,
+      label: { text: "P", color: "white", fontSize: "11px" },
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: "#16a34a", fillOpacity: 1, strokeColor: "white", strokeWeight: 2 },
+    });
+
+    activeDestMarkerRef.current = new google.maps.Marker({
+      position: activeTrip.destination,
+      map: map.current,
+      label: { text: "D", color: "white", fontSize: "11px" },
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 10, fillColor: "#dc2626", fillOpacity: 1, strokeColor: "white", strokeWeight: 2 },
+    });
+
+    const target = activeTrip.status === "accepted" ? activeTrip.pickup : activeTrip.destination;
+
+    const bounds = new google.maps.LatLngBounds();
+    bounds.extend(activeTrip.pickup);
+    bounds.extend(activeTrip.destination);
+    if (driverPos) bounds.extend(driverPos);
+    map.current.fitBounds(bounds, 80);
+
+    if (driverPos) {
+      fetchRoute(google, [driverPos.lng, driverPos.lat], [target.lng, target.lat]).then((route) => {
+        if (!route || !map.current) return;
+        setEtaMin(route.durationMin);
+        routeLineRef.current = new google.maps.Polyline({
+          path: route.path,
+          map: map.current,
+          strokeColor: "#2563eb",
+          strokeOpacity: 0.9,
+          strokeWeight: 5,
+        });
+      });
+    }
+  }, [ready, activeTrip, driverPos]);
+
+  return (
+    <div className={fullScreen ? "relative w-full h-full" : "relative w-full h-[320px] rounded-xl overflow-hidden"}>
+      <div ref={mapContainer} className="w-full h-full" />
+      {activeTrip && (
+        <div className="absolute top-2 left-2 bg-white shadow px-3 py-1.5 rounded-lg text-sm font-medium">
+          {activeTrip.status === "accepted"
+            ? etaMin !== null ? `Heading to pickup \u2014 ${etaMin} min` : "Heading to pickup..."
+            : etaMin !== null ? `To destination \u2014 ${etaMin} min` : "Trip in progress..."}
+        </div>
+      )}
+      {!activeTrip && openTrips.length === 0 && (
+        <div className="absolute top-2 left-2 bg-white shadow px-3 py-1.5 rounded-lg text-sm text-gray-500">
+          Waiting for requests...
+        </div>
+      )}
+    </div>
+  );
+}
+
+===== src\components\DriverPage.tsx =====
+import { useEffect, useRef, useState } from "react";
+import { publishDriverLocation, goOffline, type VehicleType } from "../lib/drivers";
+import DriverMap from "./DriverMap";
+import { ref, get } from "firebase/database";
+import { db } from "../firebase";
+import { listenToOpenTrips, listenToTrip, acceptTrip, updateTripStatus, markCashPayment, completeTrip, type TripRequest } from "../lib/trips";
+import { auth } from "../firebase";
+import type { User } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
+import { useToast } from "./Toast";
+
+const VEHICLES: { value: VehicleType; label: string }[] = [
+  { value: "standard", label: "Standard" },
+  { value: "truck", label: "Truck" },
+  { value: "vip", label: "VIP" },
+];
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+    setTimeout(() => {
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.type = "sine";
+      osc2.frequency.value = 880;
+      gain2.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
+      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+      osc2.start();
+      osc2.stop(ctx.currentTime + 0.4);
+    }, 450);
+  } catch {
+    // ignore if audio not supported
+  }
+}
+
+export default function DriverPage() {
+  const { showToast } = useToast();
+  const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [online, setOnline] = useState(() => localStorage.getItem("driverOnline") === "true");
+  const [vehicleType, setVehicleType] = useState<VehicleType>(() => (localStorage.getItem("driverVehicleType") as VehicleType) || "standard");
+  const [resuming, setResuming] = useState(true);
+  const [openTrips, setOpenTrips] = useState<TripRequest[]>([]);
+  const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [alertTrip, setAlertTrip] = useState<TripRequest | null>(null);
+  const [accepting, setAccepting] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [markingCash, setMarkingCash] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const watchIdRef = useRef<number | null>(null);
+  const knownTripIdsRef = useRef<Set<string>>(new Set());
+  const ignoredTripIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setAuthChecked(true);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    get(ref(db, `drivers/${user.uid}/status`)).then((snap) => {
+      const dbOnline = snap.exists() && snap.val() === "online";
+      setOnline(dbOnline);
+      localStorage.setItem("driverOnline", String(dbOnline));
+      setResuming(false);
+    }).catch(() => setResuming(false));
+  }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem("driverOnline", String(online));
+  }, [online]);
+
+  useEffect(() => {
+    localStorage.setItem("driverVehicleType", vehicleType);
+  }, [vehicleType]);
+
+  useEffect(() => {
+    if (!user) return;
+    const driverId = user.uid;
+
+    if (!online) {
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+      goOffline(driverId);
+      return;
+    }
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        setDriverPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        publishDriverLocation(driverId, pos.coords.latitude, pos.coords.longitude, vehicleType, "online");
+      },
+      (err) => {
+        setError(err.message);
+        showToast("Location error: " + err.message, "error");
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    );
+
+    return () => {
+      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+    };
+  }, [online, vehicleType, user]);
+
+  useEffect(() => {
+    if (!online || !driverPos || activeTrip) {
+      setOpenTrips([]);
+      knownTripIdsRef.current = new Set();
+      return;
+    }
+    const unsub = listenToOpenTrips(driverPos, 15, vehicleType, (rawTrips) => {
+      const trips = rawTrips.filter((t) => !ignoredTripIdsRef.current.has(t.id));
+      const newOnes = trips.filter((t) => !knownTripIdsRef.current.has(t.id));
+      if (newOnes.length > 0) {
+        playBeep();
+        setAlertTrip(newOnes[0]);
+        showToast("New ride request nearby!", "info");
+      }
+      knownTripIdsRef.current = new Set(trips.map((t) => t.id));
+      setOpenTrips(trips);
+    });
+    return unsub;
+  }, [vehicleType, online, driverPos, activeTrip]);
+
+  async function handleAccept(tripId: string) {
+    if (!user) return;
+    setError(null);
+    setAlertTrip(null);
+    setAccepting(true);
+    ignoredTripIdsRef.current.add(tripId);
+    try {
+      const won = await acceptTrip(tripId, user.uid);
+      if (!won) {
+        showToast("Too slow - another driver already accepted that trip.", "error");
+        return;
+      }
+      showToast("Trip accepted!", "success");
+      listenToTrip(tripId, (trip) => {
+        setActiveTrip(trip);
+      });
+    } catch (err: any) {
+      showToast(err.message || "Could not accept the trip.", "error");
+    } finally {
+      setAccepting(false);
+    }
+  }
+
+  async function handleStartTrip() {
+    if (!activeTrip) return;
+    setStarting(true);
+    try {
+      await updateTripStatus(activeTrip.id, "in_progress");
+      showToast("Trip started.", "success");
+    } catch (err: any) {
+      showToast(err.message || "Could not start the trip.", "error");
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  async function handleMarkCash() {
+    if (!activeTrip) return;
+    setError(null);
+    setMarkingCash(true);
+    try {
+      await markCashPayment(activeTrip.id);
+      showToast("Marked as paid in cash.", "success");
+    } catch (err: any) {
+      setError(err.message || "Could not mark as paid in cash.");
+      showToast(err.message || "Could not mark as paid in cash.", "error");
+    } finally {
+      setMarkingCash(false);
+    }
+  }
+
+  async function handleCompleteTrip() {
+    if (!activeTrip) return;
+    setError(null);
+    setCompleting(true);
+    try {
+      await completeTrip(activeTrip.id);
+      showToast("Trip completed! Payment confirmed.", "success");
+      setActiveTrip(null);
+    } catch (err: any) {
+      setError(err.message || "Could not complete trip. Make sure payment is done first.");
+      showToast(err.message || "Could not complete trip. Make sure payment is done first.", "error");
+    } finally {
+      setCompleting(false);
+    }
+  }
+
+  if (!authChecked) {
+    return <div className="max-w-3xl mx-auto px-4 py-8">Checking your session...</div>;
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-2">Driver dashboard</h1>
+        <p className="text-gray-600">Please log in first to go online and accept trips.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-[calc(100vh-96px)] md:h-[calc(100vh-108px)]">
+      {online ? (
+        <DriverMap
+          driverPos={driverPos}
+          openTrips={openTrips}
+          activeTrip={activeTrip}
+          onAccept={handleAccept}
+          fullScreen
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500 text-sm px-6 text-center">
+          Go online to see the map and start receiving requests.
+        </div>
+      )}
+
+      <div className="absolute top-3 left-3 right-3 z-20 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <select
+          value={vehicleType}
+          onChange={(e) => setVehicleType(e.target.value as VehicleType)}
+          disabled={!!activeTrip}
+          className="border rounded-lg px-3 py-3 text-base bg-white shadow"
+        >
+          {VEHICLES.map((v) => (
+            <option key={v.value} value={v.value}>{v.label}</option>
+          ))}
+        </select>
+
+        <button
+          onClick={() => setOnline((v) => !v)}
+          disabled={!!activeTrip || resuming}
+          className={`px-4 py-3 rounded-lg font-semibold text-base shadow ${online ? "bg-green-600 text-white" : "bg-white text-gray-800"}`}
+        >
+          {online ? "Online" : "Go online"}
+        </button>
+      </div>
+
+      {error && (
+        <div className="absolute top-20 left-3 right-3 z-20 bg-red-100 text-red-700 text-sm px-3 py-2 rounded-lg shadow">{error}</div>
+      )}
+
+      {alertTrip && !activeTrip && (
+        <div className="absolute inset-0 z-30 bg-black/40 flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-3 animate-pulse-once">
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">New request</p>
+            <p className="text-lg font-bold">
+              {alertTrip.tripType === "person" ? "Passenger ride" : "Goods delivery"}
+            </p>
+            <p className="text-sm text-gray-600">{alertTrip.distanceKm} km &middot; {alertTrip.price} RWF</p>
+            {alertTrip.goodsDescription && (
+              <p className="text-sm text-gray-500">{alertTrip.goodsDescription}</p>
+            )}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setAlertTrip(null)}
+                disabled={accepting}
+                className="flex-1 bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300 disabled:opacity-50"
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={() => handleAccept(alertTrip.id)}
+                disabled={accepting}
+                className="flex-1 bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {accepting && (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {accepting ? "Accepting..." : "Accept"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTrip && (
+        <div className="absolute left-0 right-0 bottom-0 z-20">
+          <div className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] px-4 pt-4 pb-6 space-y-3">
+            <h2 className="font-semibold">Active trip</h2>
+            <p className="text-sm font-medium">
+              {activeTrip.tripType === "person" ? "Passenger" : "Goods delivery"}
+            </p>
+            <p className="text-sm text-gray-600">{activeTrip.distanceKm} km &middot; {activeTrip.price} RWF</p>
+            {activeTrip.goodsDescription && (
+              <p className="text-sm text-gray-500">{activeTrip.goodsDescription}</p>
+            )}
+            <p className="text-sm font-medium">Status: {activeTrip.status}</p>
+
+            {activeTrip.status === "accepted" && (
+              <button
+                onClick={handleStartTrip}
+                disabled={starting}
+                className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {starting && (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {starting ? "Starting..." : "Start trip"}
+              </button>
+            )}
+            {activeTrip.status === "in_progress" && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">
+                  Payment:{" "}
+                  {activeTrip.paymentStatus === "successful"
+                    ? "Paid via Mobile Money"
+                    : activeTrip.paymentStatus === "cash"
+                    ? "Marked paid in cash"
+                    : activeTrip.paymentStatus === "pending"
+                    ? "Waiting for Mobile Money confirmation..."
+                    : "Not paid yet"}
+                </p>
+                {activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash" && (
+                  <button
+                    onClick={handleMarkCash}
+                    disabled={markingCash}
+                    className="w-full bg-amber-500 text-white rounded-lg py-3.5 text-base font-semibold active:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {markingCash && (
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    )}
+                    {markingCash ? "Marking..." : "Mark as paid in cash (system down)"}
+                  </button>
+                )}
+                <button
+                  onClick={handleCompleteTrip}
+                  disabled={completing || (activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash")}
+                  className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-green-700 flex items-center justify-center gap-2"
+                >
+                  {completing && (
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {completing ? "Completing..." : "Complete trip"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+===== src\components\FAQ.tsx =====
+import Reveal from "./Reveal";
+
+const col1 = [
+  { q: "Where does TikTak Rwanda operate?", a: "TikTak currently operates across Kigali, with coverage expanding to other Rwandan cities as more drivers join the platform." },
+  { q: "How do I book a taxi?", a: "Open the Ride page, search your destination, choose a vehicle type, and tap Book. The nearest available driver is notified instantly." },
+  { q: "How is the fare calculated?", a: "Fares are based on distance and vehicle type (Standard, Truck, or VIP), shown to you in RWF before you confirm your booking - no hidden fees." },
+  { q: "Can I send a package instead of riding myself?", a: "Yes. Choose Goods when booking, describe what you're sending, and a nearby driver will pick it up and deliver it to your recipient." },
+  { q: "Are TikTak drivers verified?", a: "Every driver goes through registration and ID verification before they can accept trips, and passengers can see their rating." },
+  { q: "What vehicle types are available?", a: "Standard for everyday trips, Truck for bulky items and larger loads, and VIP for extra comfort - all shown with live pricing before you book." },
+];
+
+const col2 = [
+  { q: "How do I pay?", a: "Pay directly in the app via Mobile Money, or mark your trip as paid in cash with your driver at the end of the ride." },
+  { q: "Can I track my driver in real time?", a: "Yes. Once a driver accepts your trip, their live location, route, and estimated arrival time are shown on the map." },
+  { q: "What if I need to cancel my request?", a: "You can cancel a ride from your active trip screen at any time before a driver accepts it, at no charge." },
+  { q: "Is my payment protected?", a: "Trips only mark as complete once payment is confirmed as successful or cash-paid, so both you and your driver have a clear record." },
+  { q: "How can I contact TikTak Support?", a: "Reach our support team daily from 6:00 AM to 11:00 PM at support@tiktak.rw or through the contact details in the footer." },
+  { q: "How do I become a driver?", a: "Visit the Transport Providers page, go online with your vehicle type, and start receiving nearby trip requests right away." },
+];
+
+export default function FAQ() {
+  return (
+    <section id="help" className="max-w-7xl mx-auto px-4 sm:px-6 py-20">
+      <Reveal>
+        <div className="pb-20">
+          <h2 className="text-3xl font-bold text-gray-900">FAQs</h2>
+        </div>
+      </Reveal>
+      <div className="md:flex md:space-x-12 space-y-8 md:space-y-0">
+        <div className="w-full md:w-1/2 space-y-8">
+          {col1.map((faq, i) => (
+            <Reveal key={faq.q} delayMs={i * 80}>
+              <div className="space-y-2">
+                <h4 className="text-xl font-bold text-gray-900">{faq.q}</h4>
+                <p className="text-slate-600">{faq.a}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+        <div className="w-full md:w-1/2 space-y-8">
+          {col2.map((faq, i) => (
+            <Reveal key={faq.q} delayMs={i * 80}>
+              <div className="space-y-2">
+                <h4 className="text-xl font-bold text-gray-900">{faq.q}</h4>
+                <p className="text-slate-600">{faq.a}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+===== src\components\Footer.tsx =====
+import { Link } from "react-router-dom";
+
+const socials = [
+  { label: "Facebook", href: "#", path: "M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.891h-2.33v6.987C18.343 21.128 22 16.991 22 12z" },
+  { label: "Instagram", href: "#", path: "M12 2c-2.72 0-3.06.012-4.123.06-1.062.049-1.79.218-2.425.465a4.9 4.9 0 0 0-1.771 1.153A4.9 4.9 0 0 0 2.525 5.45c-.247.636-.416 1.363-.465 2.425C2.012 8.94 2 9.28 2 12s.012 3.06.06 4.123c.049 1.062.218 1.789.465 2.425a4.9 4.9 0 0 0 1.153 1.771 4.9 4.9 0 0 0 1.771 1.153c.636.247 1.363.416 2.425.465C8.94 21.988 9.28 22 12 22s3.06-.012 4.123-.06c1.062-.049 1.789-.218 2.425-.465a4.9 4.9 0 0 0 1.771-1.153 4.9 4.9 0 0 0 1.153-1.771c.247-.636.416-1.363.465-2.425.048-1.063.06-1.403.06-4.123s-.012-3.06-.06-4.123c-.049-1.062-.218-1.79-.465-2.425a4.9 4.9 0 0 0-1.153-1.771A4.9 4.9 0 0 0 18.548.525c-.636-.247-1.363-.416-2.425-.465C15.06.012 14.72 0 12 0zm0 5.838a6.162 6.162 0 1 1 0 12.324 6.162 6.162 0 0 1 0-12.324zM12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm6.406-11.845a1.44 1.44 0 1 1 0 2.881 1.44 1.44 0 0 1 0-2.881z" },
+  { label: "YouTube", href: "#", path: "M23.498 6.186a3.02 3.02 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.02 3.02 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.02 3.02 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.376-.505a3.02 3.02 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" },
+  { label: "X", href: "#", path: "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.451-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644z" },
+  { label: "WhatsApp", href: "#", path: "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.148-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.148.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347zM12.004 2.003a9.98 9.98 0 0 0-8.5 15.24l-1.1 4.02 4.12-1.08a9.98 9.98 0 1 0 5.48-18.18zm0 18.16a8.16 8.16 0 0 1-4.16-1.14l-.298-.176-2.446.642.654-2.386-.194-.245A8.17 8.17 0 1 1 12.004 20.16z" },
+];
+
+export default function Footer() {
+  return (
+    <footer className="relative bg-slate-900 text-slate-300 pt-14 pb-6">
+      <div className="max-w-7xl mx-auto px-4">
+        <div className="grid grid-cols-2 sm:grid-cols-12 gap-10 pb-10">
+
+          <div className="col-span-2 sm:col-span-12 lg:col-span-3">
+            <h3 className="text-white font-bold text-lg mb-2">About Us</h3>
+            <div className="w-10 h-0.5 bg-cta mb-4"></div>
+            <p className="text-sm text-slate-400 leading-relaxed">
+              TikTak Rwanda connects riders and senders with nearby taxi drivers
+              for people and goods transport across Kigali, with live
+              tracking and Mobile Money payments.
+            </p>
+            <div className="flex gap-2 mt-5">
+              {socials.map((s) => (
+                <a key={s.label} href={s.href} aria-label={s.label} className="w-9 h-9 rounded-full border border-slate-600 flex items-center justify-center text-slate-300 hover:bg-cta hover:border-cta hover:text-white hover:-translate-y-0.5 transition">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d={s.path} /></svg>
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <div className="col-span-1 sm:col-span-6 lg:col-span-3">
+            <h3 className="text-white font-bold text-lg mb-2">Services</h3>
+            <div className="w-10 h-0.5 bg-cta mb-4"></div>
+            <ul className="text-sm space-y-2">
+              <li><Link to="/ride" className="hover:text-cta transition">Book a Taxi</Link></li>
+              <li><Link to="/ride" className="hover:text-cta transition">Parcel Delivery</Link></li>
+              <li><Link to="/ride" className="hover:text-cta transition">Large Item Delivery</Link></li>
+              <li><Link to="/ride" className="hover:text-cta transition">Truck &amp; Van Delivery</Link></li>
+              <li><Link to="/driver" className="hover:text-cta transition">Drive with TikTak</Link></li>
+            </ul>
+          </div>
+
+          <div className="col-span-1 sm:col-span-6 lg:col-span-3">
+            <h3 className="text-white font-bold text-lg mb-2">Quick Links</h3>
+            <div className="w-10 h-0.5 bg-cta mb-4"></div>
+            <ul className="text-sm space-y-2">
+              <li><Link to="/" className="hover:text-cta transition">Home</Link></li>
+              <li><a href="/#about" className="hover:text-cta transition">About Us</a></li>
+              <li><a href="/#how" className="hover:text-cta transition">How It Works</a></li>
+              <li><a href="/#help" className="hover:text-cta transition">FAQ</a></li>
+              <li><Link to="/driver" className="hover:text-cta transition">Become a Driver</Link></li>
+            </ul>
+          </div>
+
+          <div className="col-span-2 sm:col-span-12 lg:col-span-3">
+            <h3 className="text-white font-bold text-lg mb-2">Contact Us</h3>
+            <div className="w-10 h-0.5 bg-cta mb-4"></div>
+            <ul className="text-sm space-y-3 text-slate-400">
+              <li>+250 7XX XXX XXX</li>
+              <li>support@tiktak.rw</li>
+              <li>Daily: 6:00 AM - 11:00 PM</li>
+              <li>Kigali, Rwanda</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="border-t border-slate-700 pt-5 text-xs text-slate-500 text-center">
+          Copyright {new Date().getFullYear()} | All Rights Reserved - TikTak Rwanda Ltd.
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+
+===== src\components\Hero.tsx =====
+import { Link } from "react-router-dom";
+import heroImg from "../assets/Kigali.jpg";
+
+const categories = [
+  "Passenger Ride", "Small Package", "Furniture & Boxes", "Market Goods",
+  "Office Delivery", "Airport Transfer", "Moving Home", "Other Goods",
+];
+
+export default function Hero() {
+  return (
+    <section className="relative bg-gradient-to-r from-heroFrom to-heroTo pt-12 pb-16 rounded-bl-[100px] overflow-hidden">
+      <div className="pointer-events-none absolute -top-10 -right-10 w-64 h-64 rounded-full bg-rwYellow/10 blur-2xl" />
+      <div className="pointer-events-none absolute bottom-0 left-1/3 w-72 h-72 rounded-full bg-rwGreen/10 blur-3xl" />
+      <div className="max-w-7xl mx-auto px-4 grid md:grid-cols-2 gap-10 items-center relative">
+        <div className="animate-fadeInUp">
+          <span className="inline-block bg-white/10 text-rwYellow text-xs font-semibold tracking-wide px-3 py-1 rounded-full mb-4">
+            Made for Rwanda &middot; Kigali &amp; beyond
+          </span>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight">
+            Get a taxi <br /> <span className="text-cta">in minutes</span>
+          </h1>
+          <p className="mt-4 text-lg text-blue-200">
+            Book a ride for yourself or send a package across Kigali &mdash; live tracking, fair fares, pay by Mobile Money or cash.
+            <br />
+            Trusted by riders and passengers across Rwanda.
+          </p>
+          <div className="mt-6 bg-white rounded-2xl shadow-lg p-5 space-y-4 transition-transform hover:-translate-y-1 hover:shadow-2xl duration-300">
+            <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-700 h-[50px]" defaultValue="">
+              <option value="" disabled>What do you need moved?</option>
+              {categories.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="Pickup location in Kigali"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-700 h-[50px]"
+            />
+            <Link
+              to="/ride"
+              className="block w-full text-center bg-cta hover:bg-ctaHover text-white font-semibold py-3 rounded-lg transition transform hover:scale-[1.02]"
+            >
+              Book a Taxi Now
+            </Link>
+          </div>
+          <div className="mt-4 text-sm text-blue-200">
+            4.8/5 &middot; trusted by thousands of riders in Kigali
+          </div>
+        </div>
+        <div id="heroImageContainer" className="hidden md:block animate-fadeInUp" style={{ animationDelay: "150ms" }}>
+          <img src={heroImg} alt="Taxi driver in Kigali, Rwanda" className="w-full h-auto rounded-2xl shadow-2xl" loading="eager" fetchPriority="high" decoding="async" width="800" height="600" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+===== src\components\Home.tsx =====
+import Hero from "./Hero";
+import TrustProps from "./TrustProps";
+import HowItWorks from "./HowItWorks";
+import About from "./About";
+import PopularServices from "./PopularServices";
+import RecentDeliveries from "./RecentDeliveries";
+import ImpactCounter from "./ImpactCounter";
+import ReviewBadges from "./ReviewBadges";
+import Testimonials from "./Testimonials";
+import FAQ from "./FAQ";
+import CTABanner from "./CTABanner";
+
+export default function Home() {
+  return (
+    <>
+      <Hero />
+      <TrustProps />
+      <HowItWorks />
+      <About />
+      <PopularServices />
+      <RecentDeliveries />
+      <ImpactCounter />
+      <ReviewBadges />
+      <Testimonials />
+      <FAQ />
+      <CTABanner />
+    </>
+  );
+}
+
+
+===== src\components\HowItWorks.tsx =====
+import { Link } from "react-router-dom";
+import Reveal from "./Reveal";
+
+const steps = [
+  { number: "1", text: "Tell us where you are and where you're going in Kigali." },
+  { number: "2", text: "The nearest verified driver accepts your request in seconds." },
+  { number: "3", text: "Track your taxi live on the map and pay by Mobile Money or cash." },
+];
+
+export default function HowItWorks() {
+  return (
+    <section id="how" className="max-w-7xl mx-auto px-4 lg:px-0 mt-20">
+      <div className="py-12 rounded-tr-[100px] bg-slate-800">
+        <div className="flex flex-col xl:flex-row items-center gap-2 px-4">
+          <div className="flex flex-col items-center w-full">
+            <Reveal>
+              <h2 className="text-3xl font-bold text-white mb-12">How TikTak Rwanda works</h2>
+            </Reveal>
+            <div className="lg:pl-[88px] w-full max-w-md">
+              {steps.map((step, i) => (
+                <Reveal key={step.number} delayMs={i * 120}>
+                  <div className="flex items-center mb-8 last:mb-0 group">
+                    <div className="w-5 h-5 min-w-[1.25rem] bg-white text-black rounded-full flex items-center justify-center text-xs font-bold mr-3 transition-transform group-hover:scale-125">
+                      {step.number}
+                    </div>
+                    <div className="text-lg text-left text-slate-400">{step.text}</div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+            <div className="my-8">
+              <Link to="/ride" className="inline-flex items-center text-blue-50 bg-blue-500 hover:bg-blue-600 font-semibold px-5 py-2.5 rounded-full transition shadow-sm hover:shadow-lg hover:scale-105">
+                Book a Taxi Now
+                <span className="ml-2">-&gt;</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+===== src\components\ImpactCounter.tsx =====
+import { useEffect, useState } from "react";
+import Reveal from "./Reveal";
+
+function useCountUp(target: number, duration = 2500) {
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    let startTime: number | null = null;
+    let raf: number;
+    function step(timestamp: number) {
+      if (startTime === null) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      setValue(Math.floor(progress * target));
+      if (progress < 1) raf = requestAnimationFrame(step);
+    }
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+
+  return value;
+}
+
+export default function ImpactCounter() {
+  const rides = useCountUp(48250, 2500);
+  const digits = rides.toLocaleString().split("");
+
+  return (
+    <section className="relative max-w-7xl mx-auto mt-20 overflow-hidden rounded-tr-[100px] bg-rwGreen">
+      <Reveal>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 md:py-20 text-center md:text-left">
+          <h2 className="text-3xl font-bold text-white mb-6">
+            TikTak Rwanda in Numbers
+          </h2>
+          <p className="text-white">
+            Every day, more Rwandans choose TikTak for a fast, verified, and fairly
+            priced ride or delivery across Kigali.
+          </p>
+          <div className="flex flex-col items-center mt-8">
+            <div className="flex items-center">
+              {digits.map((d, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-center font-bold text-teal-600 bg-teal-200 h-6 w-6 sm:h-14 sm:w-14 rounded-full mr-1 transition-transform hover:scale-110"
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+            <div className="text-white mt-4">
+              Rides &amp; Deliveries Completed
+            </div>
+          </div>
+        </div>
+      </Reveal>
+    </section>
+  );
+}
+
+
+===== src\components\LiveMap.tsx =====
+import { useEffect, useRef, useState } from "react";
+import { loadGoogleMaps } from "../lib/googleMapsLoader";
+import { listenNearbyDrivers, type DriverLocation, type VehicleType } from "../lib/drivers";
+import { listenToDriverLocation } from "../lib/trackDriver";
+import { fetchRoute } from "../lib/directions";
+
+const VEHICLE_OPTIONS: { value: VehicleType | "all"; label: string; color: string }[] = [
+  { value: "all", label: "All", color: "#2563eb" },
+  { value: "standard", label: "Standard", color: "#16a34a" },
+  { value: "truck", label: "Truck", color: "#ca8a04" },
+  { value: "vip", label: "VIP", color: "#7c3aed" },
+];
+
+const VEHICLE_ICON_SVG: Record<VehicleType, string> = {
+  standard: `<path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11m-14 0h14m-14 0a2 2 0 0 0-2 2v3a1 1 0 0 0 1 1h1m14-6a2 2 0 0 1 2 2v3a1 1 0 0 1-1 1h-1M7 17v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1m13 0v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1M7 11h10" stroke="white" stroke-width="1.4" fill="none"/>`,
+  truck: `<path fill="white" d="M3 7h11v8H3zM14 10h4l3 3v2h-7zM6.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM17.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>`,
+  vip: `<path fill="white" d="M12 2l2.5 6.5L21 9l-5 4.5L17.5 21 12 17l-5.5 4L8 13.5 3 9l6.5-.5z"/>`,
+};
+
+function buildVehicleIcon(vehicleType: VehicleType, color: string, size = 36): google.maps.Icon {
+  const inner = VEHICLE_ICON_SVG[vehicleType] || VEHICLE_ICON_SVG.standard;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 36 36">
+    <circle cx="18" cy="18" r="16" fill="${color}" stroke="white" stroke-width="2"/>
+    <g transform="translate(10,10) scale(0.7)">${inner}</g>
+  </svg>`;
+  return {
+    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
+    scaledSize: new google.maps.Size(size, size),
+    anchor: new google.maps.Point(size / 2, size / 2),
+  };
+}
+
+function animateMarkerTo(marker: google.maps.Marker, to: google.maps.LatLngLiteral, duration = 800) {
+  const from = marker.getPosition();
+  if (!from) {
+    marker.setPosition(to);
+    return;
+  }
+  const fromLat = from.lat();
+  const fromLng = from.lng();
+  if (fromLat === to.lat && fromLng === to.lng) return;
+  const start = performance.now();
+
+  function step(now: number) {
+    const t = Math.min(1, (now - start) / duration);
+    marker.setPosition({ lat: fromLat + (to.lat - fromLat) * t, lng: fromLng + (to.lng - fromLng) * t });
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+interface Props {
+  onLocationChange?: (loc: [number, number]) => void;
+  trackedDriverId?: string | null;
+  onRequestVehicle?: (vehicleType: VehicleType) => void;
+  fullScreen?: boolean;
+}
+
+export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVehicle, fullScreen }: Props) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<google.maps.Map | null>(null);
+  const googleRef = useRef<typeof google | null>(null);
+  const userMarkerRef = useRef<google.maps.Marker | null>(null);
+  const driverMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const driverInfoWindowsRef = useRef<Map<string, google.maps.InfoWindow>>(new Map());
+  const trackedMarkerRef = useRef<google.maps.Marker | null>(null);
+  const routeLineRef = useRef<google.maps.Polyline | null>(null);
+  const lastRouteFetchRef = useRef(0);
+
+  const [error, setError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [vehicleFilter, setVehicleFilter] = useState<VehicleType | "all">("all");
+  const [nearbyDrivers, setNearbyDrivers] = useState<DriverLocation[]>([]);
+  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
+
+  useEffect(() => {
+    if (!mapContainer.current || map.current) return;
+
+    let watchId: number | null = null;
+
+    loadGoogleMaps()
+      .then((google) => {
+        googleRef.current = google;
+        map.current = new google.maps.Map(mapContainer.current!, {
+          center: { lat: -1.9441, lng: 30.0619 },
+          zoom: 13,
+          minZoom: 6,
+          streetViewControl: false,
+          mapTypeControl: false,
+          fullscreenControl: false,
+          zoomControl: !fullScreen,
+          restriction: {
+            latLngBounds: { north: 0.5, south: -4.5, east: 32.5, west: 27.5 },
+            strictBounds: false,
+          },
+        });
+
+        if (!navigator.geolocation) {
+          setError("Geolocation not supported by this browser.");
+          return;
+        }
+
+        watchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            const { longitude, latitude } = pos.coords;
+            setUserLocation([longitude, latitude]);
+            onLocationChange?.([longitude, latitude]);
+
+            if (!userMarkerRef.current) {
+              userMarkerRef.current = new google.maps.Marker({
+                position: { lat: latitude, lng: longitude },
+                map: map.current!,
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 8,
+                  fillColor: "#111827",
+                  fillOpacity: 1,
+                  strokeColor: "white",
+                  strokeWeight: 2,
+                },
+              });
+              map.current!.setCenter({ lat: latitude, lng: longitude });
+            } else {
+              animateMarkerTo(userMarkerRef.current, { lat: latitude, lng: longitude });
+            }
+          },
+          (err) => setError(err.message),
+          { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+        );
+      })
+      .catch((err) => setError(err.message));
+
+    return () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!userLocation || trackedDriverId) return;
+    const [lng, lat] = userLocation;
+    const unsubscribe = listenNearbyDrivers(lat, lng, 5, vehicleFilter, setNearbyDrivers);
+    return unsubscribe;
+  }, [userLocation, vehicleFilter, trackedDriverId]);
+
+  useEffect(() => {
+    const google = googleRef.current;
+    if (!map.current || !google) return;
+
+    if (trackedDriverId) {
+      driverMarkersRef.current.forEach((marker) => marker.setMap(null));
+      driverMarkersRef.current.clear();
+      driverInfoWindowsRef.current.clear();
+      return;
+    }
+
+    const currentIds = new Set(nearbyDrivers.map((d) => d.id));
+    driverMarkersRef.current.forEach((marker, id) => {
+      if (!currentIds.has(id)) {
+        marker.setMap(null);
+        driverMarkersRef.current.delete(id);
+        driverInfoWindowsRef.current.delete(id);
+      }
+    });
+
+    nearbyDrivers.forEach((driver) => {
+      const color = VEHICLE_OPTIONS.find((v) => v.value === driver.vehicleType)?.color || "#2563eb";
+      const existing = driverMarkersRef.current.get(driver.id);
+      if (existing) {
+        animateMarkerTo(existing, { lat: driver.lat, lng: driver.lng });
+        return;
+      }
+
+      const marker = new google.maps.Marker({
+        position: { lat: driver.lat, lng: driver.lng },
+        map: map.current!,
+        icon: buildVehicleIcon(driver.vehicleType, color),
+      });
+
+      const infoWindow = new google.maps.InfoWindow({
+        content: `<div style="font-size:14px;font-weight:600;text-transform:capitalize;">${driver.vehicleType}</div>
+          <button id="request-${driver.id}" style="margin-top:8px;background:#2563eb;color:white;border:none;border-radius:8px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;width:100%;min-height:44px;">Request this vehicle</button>`,
+      });
+
+      infoWindow.addListener("domready", () => {
+        const btn = document.getElementById(`request-${driver.id}`);
+        btn?.addEventListener("click", () => {
+          onRequestVehicle?.(driver.vehicleType);
+          infoWindow.close();
+        });
+      });
+
+      marker.addListener("click", () => infoWindow.open({ map: map.current!, anchor: marker }));
+
+      driverMarkersRef.current.set(driver.id, marker);
+      driverInfoWindowsRef.current.set(driver.id, infoWindow);
+    });
+  }, [nearbyDrivers, trackedDriverId, onRequestVehicle]);
+
+  useEffect(() => {
+    const google = googleRef.current;
+    if (!trackedDriverId || !map.current || !google) {
+      trackedMarkerRef.current?.setMap(null);
+      trackedMarkerRef.current = null;
+      routeLineRef.current?.setMap(null);
+      routeLineRef.current = null;
+      setRouteInfo(null);
+      return;
+    }
+
+    const unsubscribe = listenToDriverLocation(trackedDriverId, (loc) => {
+      if (!loc || !map.current) return;
+      const position = { lat: loc.lat, lng: loc.lng };
+
+      if (!trackedMarkerRef.current) {
+        trackedMarkerRef.current = new google.maps.Marker({
+          position,
+          map: map.current,
+          icon: buildVehicleIcon("standard", "#dc2626"),
+        });
+      } else {
+        animateMarkerTo(trackedMarkerRef.current, position);
+      }
+
+      if (userLocation) {
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(position);
+        bounds.extend({ lat: userLocation[1], lng: userLocation[0] });
+
+        const listener = google.maps.event.addListener(map.current, "bounds_changed", () => {
+          if ((map.current!.getZoom() ?? 0) > 15) map.current!.setZoom(15);
+          google.maps.event.removeListener(listener);
+        });
+        map.current.fitBounds(bounds, 80);
+
+        const now = Date.now();
+        if (now - lastRouteFetchRef.current > 4000) {
+          lastRouteFetchRef.current = now;
+          fetchRoute(google, [position.lng, position.lat], [userLocation[0], userLocation[1]])
+            .then((route) => {
+              if (!route || !map.current) return;
+
+              setRouteInfo({ distanceKm: route.distanceKm, durationMin: route.durationMin });
+
+              const path = route.path;
+
+              if (!routeLineRef.current) {
+                routeLineRef.current = new google.maps.Polyline({
+                  path,
+                  map: map.current,
+                  strokeColor: "#2563eb",
+                  strokeOpacity: 0.9,
+                  strokeWeight: 5,
+                });
+              } else {
+                routeLineRef.current.setPath(path);
+              }
+            })
+            .catch(() => {
+              const [dLng, dLat] = [position.lng - userLocation[0], position.lat - userLocation[1]];
+              const distanceKm = Math.sqrt(dLng * dLng + dLat * dLat) * 111;
+              setRouteInfo({ distanceKm: Math.round(distanceKm * 10) / 10, durationMin: Math.round(distanceKm * 3) });
+            });
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      trackedMarkerRef.current?.setMap(null);
+      trackedMarkerRef.current = null;
+      routeLineRef.current?.setMap(null);
+      routeLineRef.current = null;
+    };
+  }, [trackedDriverId, userLocation]);
+
+  const mapHeightClass = fullScreen ? "w-full h-full" : "relative w-full h-[240px] sm:h-[320px] md:h-[420px] rounded-2xl overflow-hidden border border-gray-200 shadow-md";
+
+  return (
+    <div className={fullScreen ? "relative w-full h-full" : "w-full"}>
+      {!trackedDriverId && (
+        <div className={fullScreen ? "absolute top-3 left-3 right-3 z-20 flex gap-2 overflow-x-auto" : "flex gap-2 mb-3"}>
+          {VEHICLE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setVehicleFilter(opt.value)}
+              className={`px-4 py-2.5 rounded-lg text-sm font-medium border transition min-h-[44px] shadow ${
+                vehicleFilter === opt.value ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-700 border-gray-300"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className={mapHeightClass}>
+        <div
+          className={
+            fullScreen
+              ? "absolute inset-1 sm:inset-2 md:inset-3 rounded-2xl overflow-hidden border-2 border-white shadow-2xl ring-1 ring-black/10"
+              : "relative w-full h-full rounded-2xl overflow-hidden border-2 border-white shadow-xl ring-1 ring-black/10"
+          }
+        >
+          <div ref={mapContainer} className="w-full h-full" />
+
+          <div className="pointer-events-none absolute top-0 left-0 w-7 h-7 border-t-[3px] border-l-[3px] border-cta rounded-tl-2xl" />
+          <div className="pointer-events-none absolute top-0 right-0 w-7 h-7 border-t-[3px] border-r-[3px] border-cta rounded-tr-2xl" />
+          <div className="pointer-events-none absolute bottom-0 left-0 w-7 h-7 border-b-[3px] border-l-[3px] border-cta rounded-bl-2xl" />
+          <div className="pointer-events-none absolute bottom-0 right-0 w-7 h-7 border-b-[3px] border-r-[3px] border-cta rounded-br-2xl" />
+        </div>
+        {error && (
+          <div className="absolute top-16 left-2 right-2 z-20 bg-red-100 text-red-700 text-sm px-3 py-2 rounded shadow">{error}</div>
+        )}
+      </div>
+
+      {!trackedDriverId && (
+        <p className={fullScreen ? "absolute bottom-3 left-3 z-20 bg-white shadow px-3 py-1.5 rounded-lg text-sm text-gray-600" : "mt-2 text-sm text-gray-600"}>
+          {nearbyDrivers.length} {vehicleFilter === "all" ? "vehicle(s)" : vehicleFilter + "(s)"} nearby
+        </p>
+      )}
+      {trackedDriverId && (
+        <p className={fullScreen ? "absolute top-3 left-3 right-3 z-20 bg-white shadow px-3 py-2 rounded-lg text-sm text-gray-600" : "mt-2 text-sm text-gray-600"}>
+          Your driver is on the way{routeInfo ? ` \u2014 ${routeInfo.distanceKm} km, about ${routeInfo.durationMin} min away` : ""}.
+        </p>
+      )}
+    </div>
+  );
+}
+
+===== src\components\Navbar.tsx =====
+import { useState, useRef, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import type { User } from "firebase/auth";
+import { services } from "../lib/services";
+import { useCart } from "./Cart";
+
+interface NavbarProps {
+  user: User | null;
+  onLoginClick: () => void;
+}
+
+export default function Navbar({ user, onLoginClick }: NavbarProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [servicesOpen, setServicesOpen] = useState(false);
+  const servicesRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+  const location = useLocation();
+  const { itemCount } = useCart();
+
+  function isActive(path: string) {
+    return location.pathname === path;
+  }
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (servicesRef.current && !servicesRef.current.contains(e.target as Node)) {
+        setServicesOpen(false);
+      }
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(e.target as Node) &&
+        hamburgerRef.current &&
+        !hamburgerRef.current.contains(e.target as Node)
+      ) {
+        setMobileOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setServicesOpen(false);
+        setMobileOpen(false);
+      }
+    }
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, []);
+
+  const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cta focus-visible:ring-offset-2";
+
+  return (
+    <>
+      <div className="bg-black py-1.5 px-4">
+        <div className="max-w-7xl mx-auto px-4">
+          <ul className="flex gap-3 text-[11px] sm:text-xs text-slate-300 overflow-x-auto whitespace-nowrap">
+            <li><a href="/" className={`text-white rounded ${focusRing} focus-visible:ring-offset-black`}>Personal Use</a></li>
+            <li className="text-slate-500">Business Use (coming soon)</li>
+            <li><Link to="/driver" className={`hover:text-white transition-colors rounded ${focusRing} focus-visible:ring-offset-black`}>Transport Providers</Link></li>
+          </ul>
+        </div>
+      </div>
+
+      <header className="relative bg-slate-800 w-full z-30">
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16 md:h-20">
+          <div className="flex items-center gap-2 font-bold text-xl text-white">
+            <Link to="/" className={`flex items-center gap-2 rounded ${focusRing} focus-visible:ring-offset-slate-800`}>
+              <svg width="28" height="28" viewBox="0 0 64 64"><defs><linearGradient id="navlogo" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fea142"/><stop offset="100%" stop-color="#f98b1b"/></linearGradient></defs><circle cx="32" cy="32" r="30" fill="url(#navlogo)"/><path d="M32 14c-7.2 0-13 5.8-13 13 0 9.7 13 23 13 23s13-13.3 13-23c0-7.2-5.8-13-13-13z" fill="white"/><circle cx="32" cy="27" r="5.5" fill="#0f4c8b"/></svg>
+              TikTak
+            </Link>
+          </div>
+
+          <nav className="hidden lg:flex items-center gap-6 text-base text-slate-100">
+            <div className="relative" ref={servicesRef}>
+              <button
+                onClick={() => setServicesOpen((v) => !v)}
+                aria-expanded={servicesOpen}
+                aria-haspopup="true"
+                className={`flex items-center gap-1 hover:text-cta transition-colors rounded ${focusRing} focus-visible:ring-offset-slate-800`}
+              >
+                Services
+                <svg className={`w-2.5 h-2.5 transform transition-transform ${servicesOpen ? "rotate-180" : ""}`} viewBox="0 0 10 6" fill="none">
+                  <path d="m1 1 4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {servicesOpen && (
+                <div className="absolute left-0 bg-white rounded-lg shadow-md text-slate-700 animate-fadeInUp">
+                  <ul className="text-sm py-1">
+                    {services.map((s) => (
+                      <li key={s.slug}>
+                        <Link
+                          to={`/services/${s.slug}`}
+                          onClick={() => setServicesOpen(false)}
+                          className={`block px-4 py-1 whitespace-nowrap hover:bg-gray-100 hover:text-cta rounded-lg transition-colors ${focusRing} focus-visible:ring-offset-white`}
+                        >
+                          {s.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <Link to="/ride" className={`relative pb-1 transition-colors hover:text-cta rounded ${focusRing} focus-visible:ring-offset-slate-800 ${isActive("/ride") ? "text-cta after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-cta after:rounded-full" : ""}`}>
+              Book a Ride
+            </Link>
+            <Link to="/driver" className={`relative pb-1 transition-colors hover:text-cta rounded ${focusRing} focus-visible:ring-offset-slate-800 ${isActive("/driver") ? "text-cta after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-cta after:rounded-full" : ""}`}>
+              Drive with TikTak
+            </Link>
+            <a href="/#how" className={`hover:text-cta transition-colors rounded ${focusRing} focus-visible:ring-offset-slate-800`}>How It Works</a>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <Link
+              to="/cart"
+              aria-label="Cart"
+              className={`relative flex items-center justify-center min-w-[44px] min-h-[44px] text-slate-100 hover:text-cta transition-colors rounded ${focusRing} focus-visible:ring-offset-slate-800`}
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.938-4.716 2.426-7.218a1.125 1.125 0 00-1.11-1.325H5.106M7.5 14.25L5.106 5.25M7.5 14.25L5.25 12M12 15.75h.008v.008H12v-.008z" />
+              </svg>
+              {itemCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-cta text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {itemCount}
+                </span>
+              )}
+            </Link>
+            {user ? (
+              <>
+                <Link
+                  to="/profile"
+                  className={`hidden sm:flex items-center gap-1.5 text-sm hover:text-cta border rounded-full px-3 py-1.5 transition-colors ${focusRing} focus-visible:ring-offset-slate-800 ${isActive("/profile") ? "text-cta border-cta" : "text-slate-100 border-slate-600 hover:border-cta"}`}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+                  Profile
+                </Link>
+              </>
+            ) : (
+              <button
+                onClick={onLoginClick}
+                className={`hidden sm:inline text-sm text-slate-100 hover:text-cta transition-colors rounded ${focusRing} focus-visible:ring-offset-slate-800`}
+              >
+                Log in
+              </button>
+            )}
+            <Link
+              to="/ride"
+              className={`bg-cta hover:bg-ctaHover text-white text-sm font-semibold px-4 py-2.5 rounded-full transition min-h-[44px] flex items-center hover:scale-105 ${focusRing} focus-visible:ring-offset-slate-800`}
+            >
+              Book Now
+            </Link>
+            <button
+              ref={hamburgerRef}
+              className={`lg:hidden text-white min-w-[44px] min-h-[44px] flex items-center justify-center rounded ${focusRing} focus-visible:ring-offset-slate-800`}
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-label="Toggle menu"
+              aria-expanded={mobileOpen}
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {mobileOpen && (
+          <div ref={mobileMenuRef} className="lg:hidden fixed top-16 left-0 w-full h-screen bg-white shadow-lg z-50 px-4 py-4 animate-fadeInUp">
+            <ul className="text-gray-700 space-y-3 text-base">
+              {user ? (
+                <li><Link to="/profile" className={`block hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/profile") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Profile</Link></li>
+              ) : (
+                <li><button onClick={onLoginClick} className={`block hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white`}>Log in</button></li>
+              )}
+              <li>
+                <Link to="/cart" className={`flex items-center gap-2 hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/cart") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>
+                  Cart{itemCount > 0 ? ` (${itemCount})` : ""}
+                </Link>
+              </li>
+              <li><Link to="/ride" className={`block hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/ride") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Book a Ride</Link></li>
+              <li><Link to="/driver" className={`block hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/driver") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Drive with TikTak</Link></li>
+              <li><a href="/#how" className={`block hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white`}>How It Works</a></li>
+              {services.map((s) => (
+                <li key={s.slug}><Link to={`/services/${s.slug}`} className={`block hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white`} onClick={() => setMobileOpen(false)}>{s.name}</Link></li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </header>
+    </>
+  );
+}
+
+===== src\components\Navbar.tsx.bak4 =====
+import { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
+import type { User } from "firebase/auth";
+
+const services = [
+  "Furniture Delivery",
+  "Motorbike Transport",
+  "Car Transport",
+  "Man And Van",
+  "eBay Deliveries",
+  "Fragile Item Transport",
+  "Boat Transport",
+  "Removals",
+];
+
+interface NavbarProps {
+  user: User | null;
+  onLoginClick: () => void;
+  onLogoutClick: () => void;
+}
+
+export default function Navbar({ user, onLoginClick, onLogoutClick }: NavbarProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [servicesOpen, setServicesOpen] = useState(false);
+  const servicesRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (servicesRef.current && !servicesRef.current.contains(e.target as Node)) {
+        setServicesOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <>
+      <div className="bg-black py-1 pl-8">
+        <div className="max-w-7xl mx-auto px-4">
+          <ul className="flex gap-4 text-xs text-slate-300">
+            <li><a href="/" className="text-white">Personal Use</a></li>
+            <li className="text-slate-500">Business Use (coming soon)</li>
+            <li><Link to="/driver" className="hover:text-white">Transport Providers</Link></li>
+          </ul>
+        </div>
+      </div>
+
+      <header className="relative bg-slate-800 w-full z-30">
+        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16 md:h-20">
+          <div className="flex items-center gap-2 font-bold text-xl text-white">
+            <Link to="/">TikTak</Link>
+          </div>
+
+          <nav className="hidden lg:flex items-center gap-6 text-sm text-slate-100">
+            <div className="relative" ref={servicesRef}>
+              <button
+                onClick={() => setServicesOpen((v) => !v)}
+                className="flex items-center gap-1 hover:text-cta"
+              >
+                Services
+                <svg className={`w-2.5 h-2.5 transform transition-transform ${servicesOpen ? "rotate-180" : ""}`} viewBox="0 0 10 6" fill="none">
+                  <path d="m1 1 4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {servicesOpen && (
+                <div className="absolute left-0 bg-white rounded-lg shadow-md text-slate-700">
+                  <ul className="text-sm py-1">
+                    {services.map((s) => (
+                      <li key={s}>
+                        <Link
+                          to="/ride"
+                          onClick={() => setServicesOpen(false)}
+                          className="block px-4 py-1 whitespace-nowrap hover:bg-gray-100 hover:text-cta rounded-lg"
+                        >
+                          {s}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <Link to="/ride" className="hover:text-cta">Book a Ride</Link>
+            <Link to="/driver" className="hover:text-cta">Drive with TikTak</Link>
+            <a href="/#how" className="hover:text-cta">How It Works</a>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            {user ? (
+              <>
+                <span className="hidden sm:inline text-sm text-slate-100">
+                  {user.email ?? user.displayName}
+                </span>
+                <button
+                  onClick={onLogoutClick}
+                  className="hidden sm:inline text-sm text-slate-100 hover:text-cta"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={onLoginClick}
+                className="hidden sm:inline text-sm text-slate-100 hover:text-cta"
+              >
+                Log in
+              </button>
+            )}
+            <Link
+              to="/ride"
+              className="bg-cta hover:bg-ctaHover text-white text-sm font-semibold px-4 py-2 rounded-full transition"
+            >
+              Book Now
+            </Link>
+            <button
+              className="lg:hidden text-white"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label="Toggle menu"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {mobileOpen && (
+          <div className="lg:hidden fixed top-16 left-0 w-full h-screen bg-white shadow-lg z-50 px-4 py-4">
+            <ul className="text-gray-700 space-y-3">
+              {user ? (
+                <li><button onClick={onLogoutClick} className="block hover:text-cta">Log out</button></li>
+              ) : (
+                <li><button onClick={onLoginClick} className="block hover:text-cta">Log in</button></li>
+              )}
+              <li><Link to="/ride" className="block hover:text-cta">Book a Ride</Link></li>
+              <li><Link to="/driver" className="block hover:text-cta">Drive with TikTak</Link></li>
+              <li><a href="/#how" className="block hover:text-cta">How It Works</a></li>
+              {services.map((s) => (
+                <li key={s}><Link to="/ride" className="block hover:text-cta">{s}</Link></li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </header>
+    </>
+  );
+}
+
+
+===== src\components\PaymentButton.tsx =====
+import { useState, useEffect, useRef } from "react";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../firebase";
+import { useToast } from "./Toast";
+
+interface Props {
+  tripId: string;
+  amount: number;
+  paymentStatus?: string;
+}
+
+export default function PaymentButton({ tripId, amount, paymentStatus }: Props) {
+  const { showToast } = useToast();
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [requesting, setRequesting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const prevStatusRef = useRef<string | undefined>(paymentStatus);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  // Stop polling once Firestore/RTDB confirms a terminal state, and toast the outcome
+  useEffect(() => {
+    if (paymentStatus !== prevStatusRef.current) {
+      if (paymentStatus === "successful") {
+        showToast("Payment received. Thank you!", "success");
+      } else if (paymentStatus === "failed") {
+        showToast("Payment failed. Please try again.", "error");
+      }
+      prevStatusRef.current = paymentStatus;
+    }
+
+    if (paymentStatus === "successful" || paymentStatus === "failed") {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      setRequesting(false);
+    }
+  }, [paymentStatus, showToast]);
+
+  function normalizePhone(raw: string): string {
+    const digits = raw.replace(/[^0-9]/g, "");
+    if (digits.startsWith("250")) return digits;
+    if (digits.startsWith("0")) return "250" + digits.slice(1);
+    if (digits.startsWith("7")) return "250" + digits;
+    return digits;
+  }
+
+  async function handlePay() {
+    setError(null);
+    if (!phoneNumber) {
+      setError("Enter your Mobile Money phone number.");
+      showToast("Enter your Mobile Money phone number.", "error");
+      return;
+    }
+    setRequesting(true);
+
+    try {
+      const requestMomoPayment = httpsCallable(functions, "requestMomoPayment");
+      const result: any = await requestMomoPayment({ phoneNumber: normalizePhone(phoneNumber), tripId });
+      const referenceId = result.data.referenceId;
+      showToast("Payment request sent. Check your phone to confirm.", "info");
+      pollStatus(referenceId);
+    } catch (err: any) {
+      setError(err.message || "Payment request failed.");
+      showToast(err.message || "Payment request failed. Please try again.", "error");
+      setRequesting(false);
+    }
+  }
+
+  function pollStatus(referenceId: string) {
+    const checkMomoPaymentStatus = httpsCallable(functions, "checkMomoPaymentStatus");
+    pollRef.current = setInterval(async () => {
+      try {
+        await checkMomoPaymentStatus({ referenceId, tripId });
+        // paymentStatus prop updates via the live trip listener in the parent;
+        // the effect above stops polling and toasts once it reaches a terminal state.
+      } catch {
+        // keep polling silently on transient errors
+      }
+    }, 4000);
+  }
+
+  if (paymentStatus === "successful") {
+    return <p className="text-green-600 font-medium">Payment received. Thank you!</p>;
+  }
+
+  const isPending = paymentStatus === "pending" || requesting;
+
+  return (
+    <div className="p-4 border rounded-lg space-y-3">
+      <p className="font-medium">Pay {amount} via Mobile Money</p>
+      <input
+        type="tel"
+        placeholder="e.g. 078XXXXXXX or 25078XXXXXXX"
+        value={phoneNumber}
+        onChange={(e) => setPhoneNumber(e.target.value)}
+        className="w-full border rounded-lg px-3 py-3 text-base"
+        disabled={isPending}
+      />
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {paymentStatus === "failed" && (
+        <p className="text-red-600 text-sm">Payment failed. Please try again.</p>
+      )}
+      {isPending && <p className="text-sm text-gray-500">Waiting for confirmation on your phone...</p>}
+      <button
+        onClick={handlePay}
+        disabled={isPending}
+        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700 flex items-center justify-center gap-2"
+      >
+        {isPending && (
+          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        )}
+        {isPending ? "Waiting..." : "Pay now"}
+      </button>
+    </div>
+  );
+}
+
+===== src\components\PopularServices.tsx =====
+import { Link } from "react-router-dom";
+import { services } from "../lib/services";
+import Reveal from "./Reveal";
+
+export default function PopularServices() {
+  return (
+    <section className="relative mt-20">
+      <div className="max-w-7xl mx-auto border-2 border-slate-100 bg-gradient-to-t from-white rounded-tr-[100px] px-4 sm:px-6 py-8">
+        <Reveal>
+          <h2 className="text-center md:text-left text-2xl font-bold text-gray-900 py-8">
+            Popular Services in Kigali
+          </h2>
+        </Reveal>
+        <div className="flex justify-center">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {services.map((service, i) => (
+              <Reveal key={service.slug} delayMs={(i % 4) * 100}>
+                <Link
+                  to={`/services/${service.slug}`}
+                  className={`relative bg-gray-200 border border-gray-300 rounded-md overflow-hidden group h-[200px] w-[135px] sm:h-[298px] sm:w-[198px] block transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl ${i % 2 === 1 ? "mt-10 sm:mt-20" : ""}`}
+                >
+                  <img src={service.img} alt={service.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" decoding="async" width="198" height="298" />
+                  <span className="absolute bottom-0 left-0 z-10 pl-2 pb-1 text-left text-white font-bold text-lg">
+                    {service.name}
+                  </span>
+                  <div className="absolute inset-0 bg-[#1E293B] opacity-0 group-hover:opacity-60 transition-opacity duration-300" />
+                </Link>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+===== src\components\Profile.tsx =====
+import { useEffect, useState } from "react";
+import { ref, get, set } from "firebase/database";
+import { updateProfile, type User } from "firebase/auth";
+import { db } from "../firebase";
+
+interface ProfileProps {
+  user: User | null;
+  onLogoutClick: () => void;
+}
+
+export default function Profile({ user, onLogoutClick }: ProfileProps) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    const userRef = ref(db, `users/${user.uid}`);
+    get(userRef)
+      .then((snap) => {
+        const data = snap.val();
+        setName(data?.name ?? user.displayName ?? "");
+        setPhone(data?.phone ?? "");
+      })
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user) return;
+    setSaving(true);
+    setMessage("");
+    try {
+      await set(ref(db, `users/${user.uid}`), {
+        name,
+        phone,
+        email: user.email ?? null,
+        updatedAt: Date.now(),
+      });
+      if (name && name !== user.displayName) {
+        await updateProfile(user, { displayName: name });
+      }
+      setMessage("Profile updated.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!user) {
+    return (
+      <section className="max-w-xl mx-auto px-4 py-20 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Profile</h1>
+        <p className="text-gray-500">Please log in to view and edit your profile.</p>
+      </section>
+    );
+  }
+
+  if (loading) {
+    return (
+      <section className="max-w-xl mx-auto px-4 py-20 text-center text-gray-500">
+        Loading profile...
+      </section>
+    );
+  }
+
+  return (
+    <section className="max-w-xl mx-auto px-4 py-16">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
+        <button
+          onClick={onLogoutClick}
+          className="text-sm text-red-500 hover:text-red-600 font-medium border border-red-200 hover:bg-red-50 rounded-full px-4 py-2 transition"
+        >
+          Log out
+        </button>
+      </div>
+
+      <form onSubmit={handleSave} className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input
+            type="email"
+            value={user.email ?? ""}
+            disabled
+            className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-3 text-gray-500"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your full name"
+            className="w-full border border-gray-300 rounded-lg px-3 py-3 text-gray-800"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+250 7XX XXX XXX"
+            className="w-full border border-gray-300 rounded-lg px-3 py-3 text-gray-800"
+          />
+        </div>
+
+        {message && (
+          <div className="text-sm rounded-lg px-3 py-2 bg-green-50 text-green-700">
+            {message}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full bg-cta hover:bg-ctaHover text-white font-semibold py-3.5 rounded-lg transition disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+
+===== src\components\RecentDeliveries.tsx =====
+import Reveal from "./Reveal";
+
+const deliveries = [
+  { item: "Passenger Ride", from: "Kimironko, Kigali", to: "Nyabugogo, Kigali", price: "2,400 RWF" },
+  { item: "Office Parcel", from: "Kacyiru, Kigali", to: "Remera, Kigali", price: "1,800 RWF" },
+  { item: "Airport Transfer", from: "Kigali International Airport", to: "Kimihurura, Kigali", price: "6,500 RWF" },
+  { item: "Market Goods", from: "Kimisagara Market", to: "Gikondo, Kigali", price: "3,200 RWF" },
+];
+
+const trustPoints = [
+  "Move Anything, Large or Small",
+  "Fair, Distance-Based RWF Pricing",
+  "Verified & Rated Drivers",
+  "Dedicated Trust & Safety Team",
+  "Friendly Customer Support Team",
+];
+
+export default function RecentDeliveries() {
+  return (
+    <section className="relative mt-20">
+      <div className="max-w-7xl mx-auto bg-gradient-to-b from-slate-100 rounded-tl-[100px] px-4 sm:px-6 pt-8 pb-12">
+        <div className="flex flex-col md:flex-row items-start justify-between gap-10">
+          <Reveal className="md:order-1 md:max-w-md">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Recent Rides &amp; Deliveries</h2>
+            <p className="text-lg text-slate-500 mb-6">
+              Thousands of people across Kigali use TikTak Rwanda every day to get
+              around and move goods quickly, at a fair local price.
+            </p>
+            <ul className="flex flex-col text-slate-600 space-y-3">
+              {trustPoints.map((point) => (
+                <li key={point} className="flex items-center">
+                  <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center text-xs mr-3">&#10003;</span>
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+
+          <div className="flex gap-4 overflow-x-auto max-w-full md:max-w-md pb-4">
+            {deliveries.map((d, i) => (
+              <Reveal key={d.item} delayMs={i * 100}>
+                <div className="flex flex-col bg-white rounded-lg overflow-hidden shadow-lg min-w-[260px] transition hover:-translate-y-1 hover:shadow-xl duration-300">
+                  <div className="w-full h-[160px] bg-gray-200" />
+                  <div className="px-6 pt-4">
+                    <div className="font-bold text-xl mb-2">{d.item}</div>
+                    <div className="text-gray-700 flex flex-col text-sm">
+                      <div>{d.from}</div>
+                      <div className="w-px h-6 bg-gray-300 ml-1 my-1" />
+                      <div>{d.to}</div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end items-center mt-2">
+                    <div className="px-6 py-2 bg-cta text-white font-bold rounded-tl-lg">
+                      {d.price}
+                    </div>
+                  </div>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+===== src\components\Reveal.tsx =====
+import { useEffect, useRef, useState, type ReactNode } from "react";
+
+interface RevealProps {
+  children: ReactNode;
+  className?: string;
+  delayMs?: number;
+}
+
+export default function Reveal({ children, className = "", delayMs = 0 }: RevealProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      style={{ animationDelay: visible ? `${delayMs}ms` : undefined }}
+      className={`${visible ? "animate-fadeInUp" : "opacity-0"} ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+
+===== src\components\ReviewBadges.tsx =====
+import Reveal from "./Reveal";
+
+export default function ReviewBadges() {
+  return (
+    <section className="py-12">
+      <div className="max-w-4xl mx-auto px-4 flex flex-col md:flex-row justify-between text-center gap-8">
+        <Reveal className="md:w-1/3">
+          <div className="flex justify-center mb-3">
+            <svg className="w-10 h-10 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 15.27L16.18 19l-1.64-7.03L20 7.24l-7.19-.61L10 0 7.19 6.63 0 7.24l5.46 4.73L3.82 19z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900">4.8/5 Rider Rating</h3>
+          <p className="text-gray-500 text-sm mt-1">from passengers across Kigali</p>
+        </Reveal>
+        <Reveal className="md:w-1/3" delayMs={120}>
+          <div className="flex justify-center mb-3">
+            <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-gray-600 text-sm">
+            Every rider is ID-verified before joining TikTak Rwanda
+          </p>
+        </Reveal>
+        <Reveal className="md:w-1/3" delayMs={240}>
+          <div className="flex justify-center mb-3">
+            <svg className="w-10 h-10 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10 15.27L16.18 19l-1.64-7.03L20 7.24l-7.19-.61L10 0 7.19 6.63 0 7.24l5.46 4.73L3.82 19z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-semibold text-gray-900">4.6/5 Delivery Rating</h3>
+          <p className="text-gray-500 text-sm mt-1">for parcel &amp; goods delivery</p>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
+
+===== src\components\RidePage.tsx =====
+import { useState } from "react";
+import LiveMap from "./LiveMap";
+import BookingForm from "./BookingForm";
+import AddressSearch from "./AddressSearch";
+import { publishDriverLocation, type VehicleType } from "../lib/drivers";
+import type { TripRequest } from "../lib/trips";
+import type { GeocodeResult } from "../lib/geocode";
+
+export default function RidePage() {
+  const [seeding, setSeeding] = useState(false);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
+  const [preselectedVehicle, setPreselectedVehicle] = useState<VehicleType | null>(null);
+  const [destination, setDestination] = useState<GeocodeResult | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  async function seedTestDrivers() {
+    setSeeding(true);
+    await publishDriverLocation("driver1", -1.9450, 30.0610, "standard", "online");
+    await publishDriverLocation("driver2", -1.9430, 30.0630, "truck", "online");
+    await publishDriverLocation("driver3", -1.9440, 30.0600, "vip", "online");
+    setSeeding(false);
+  }
+
+  const trackedDriverId =
+    activeTrip && (activeTrip.status === "accepted" || activeTrip.status === "in_progress")
+      ? activeTrip.driverId
+      : null;
+
+  return (
+    <div className="relative w-full h-[calc(100vh-96px)] md:h-[calc(100vh-108px)]">
+      <LiveMap
+        onLocationChange={setUserLocation}
+        trackedDriverId={trackedDriverId}
+        onRequestVehicle={(v) => {
+          setPreselectedVehicle(v);
+          setSheetOpen(true);
+        }}
+        fullScreen
+      />
+
+      {!trackedDriverId && !activeTrip && (
+        <div className="absolute top-16 left-3 right-3 z-20">
+          <div className="bg-white rounded-xl shadow-lg p-1">
+            <AddressSearch
+              placeholder="Where are you going?"
+              onSelect={(place) => {
+                setDestination(place);
+                setSheetOpen(true);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {import.meta.env.DEV && (
+        <button
+          onClick={seedTestDrivers}
+          disabled={seeding}
+          className="absolute top-3 right-3 z-20 text-xs px-3 py-2 rounded-lg bg-white shadow font-medium text-gray-700"
+        >
+          {seeding ? "Seeding..." : "Seed test drivers"}
+        </button>
+      )}
+
+      {!sheetOpen && (destination || activeTrip) && (
+        <button
+          onClick={() => setSheetOpen(true)}
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white font-semibold px-6 py-3 rounded-full shadow-lg"
+        >
+          {activeTrip ? "Trip details" : "Choose a ride"}
+        </button>
+      )}
+
+      <div
+        className={`absolute left-0 right-0 bottom-0 z-20 transition-transform duration-300 ${
+          sheetOpen ? "translate-y-0" : "translate-y-full"
+        }`}
+      >
+        <div className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] max-h-[75vh] overflow-y-auto">
+          <div className="flex justify-center pt-2 pb-1">
+            <button
+              onClick={() => setSheetOpen(false)}
+              className="w-10 h-1.5 rounded-full bg-gray-300"
+              aria-label="Collapse"
+            />
+          </div>
+          <div className="px-4 pb-6">
+            <BookingForm
+              userLocation={userLocation}
+              destination={destination}
+              onTripChange={setActiveTrip}
+              preselectedVehicle={preselectedVehicle}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+===== src\components\ServicePage.tsx =====
+import { useParams, Link } from "react-router-dom";
+import { services } from "../lib/services";
+
+export default function ServicePage() {
+  const { slug } = useParams<{ slug: string }>();
+  const service = services.find((s) => s.slug === slug);
+
+  if (!service) {
+    return (
+      <section className="max-w-xl mx-auto px-4 py-20 text-center">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Service not found</h1>
+        <Link to="/" className="text-cta hover:underline">Back to home</Link>
+      </section>
+    );
+  }
+
+  return (
+    <section className="max-w-5xl mx-auto px-4 py-12">
+      <div className="grid md:grid-cols-2 gap-8 items-center">
+        <div>
+          <img
+            src={service.img}
+            alt={service.name}
+            className="w-full h-64 md:h-96 object-cover rounded-2xl"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">{service.name}</h1>
+          <p className="text-lg text-slate-600 mb-6">{service.description}</p>
+          <Link
+            to="/ride"
+            className="inline-block bg-cta hover:bg-ctaHover text-white font-semibold px-6 py-3 rounded-full transition"
+          >
+            Get Quotes Now
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+===== src\components\Testimonials.tsx =====
+import Reveal from "./Reveal";
+
+const testimonials = [
+  { name: "Eric N.", text: "I book a taxi almost every day for work. Drivers show up fast and I can see them coming on the map." },
+  { name: "Aline U.", text: "Sent a parcel to my sister in Remera and it arrived in under 30 minutes. Very easy to use." },
+  { name: "Jean Paul H.", text: "Paying with Mobile Money is smooth and I always know the price before I book. No surprises." },
+  { name: "Diane K.", text: "As a driver, TikTak keeps me busy with nearby requests and the app is simple to use on the road." },
+];
+
+export default function Testimonials() {
+  return (
+    <section className="bg-slate-50 py-16">
+      <div className="max-w-6xl mx-auto px-4">
+        <Reveal>
+          <h2 className="text-center text-2xl font-bold text-gray-900 mb-10">What Kigali riders are saying</h2>
+        </Reveal>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {testimonials.map((t, i) => (
+            <Reveal key={t.name} delayMs={i * 100}>
+              <div className="bg-white rounded-2xl shadow-sm p-6 transition hover:shadow-lg hover:-translate-y-1 duration-300">
+                <div className="w-14 h-14 rounded-full bg-gray-200 mb-4" />
+                <p className="text-gray-700 text-sm italic">"{t.text}"</p>
+                <div className="mt-4 font-semibold text-gray-900 text-sm">{t.name}</div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
+===== src\components\Toast.tsx =====
+import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+
+type ToastKind = "success" | "error" | "info";
+
+interface ToastItem {
+  id: number;
+  message: string;
+  kind: ToastKind;
+}
+
+interface ToastContextValue {
+  showToast: (message: string, kind?: ToastKind) => void;
+}
+
+const ToastContext = createContext<ToastContextValue | null>(null);
+
+export function useToast() {
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error("useToast must be used within ToastProvider");
+  return ctx;
+}
+
+const styles: Record<ToastKind, string> = {
+  success: "bg-green-600",
+  error: "bg-red-600",
+  info: "bg-slate-800",
+};
+
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const showToast = useCallback((message: string, kind: ToastKind = "info") => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, kind }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3500);
+  }, []);
+
+  return (
+    <ToastContext.Provider value={{ showToast }}>
+      {children}
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-[92%] max-w-sm pointer-events-none">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            role="status"
+            aria-live="polite"
+            className={`${styles[t.kind]} text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg animate-fadeInUp pointer-events-auto text-center`}
+          >
+            {t.message}
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+
+===== src\components\TrustProps.tsx =====
+import Reveal from "./Reveal";
+
+const items = [
+  {
+    title: "Fast Pickup",
+    desc: "Nearby riders see your request instantly and are on their way in minutes, anywhere in Kigali.",
+    icon: "\u26a1",
+  },
+  {
+    title: "Verified Riders",
+    desc: "Every driver on TikTak Rwanda is registered and rated by real passengers for your safety.",
+    icon: "\ud83d\udee1\ufe0f",
+  },
+  {
+    title: "Fair, Local Pricing",
+    desc: "Transparent RWF fares based on distance \u2014 pay by Mobile Money or cash, no surprises.",
+    icon: "\ud83d\udcb0",
+  },
+];
+
+export default function TrustProps() {
+  return (
+    <section className="max-w-7xl mx-auto px-4 py-16">
+      <Reveal>
+        <h2 className="text-center text-2xl font-bold text-gray-900 mb-10">
+          Thousands of Rwandans ride with TikTak
+        </h2>
+      </Reveal>
+      <div className="grid md:grid-cols-3 gap-8">
+        {items.map((item, i) => (
+          <Reveal key={item.title} delayMs={i * 120}>
+            <div className="text-center px-4 py-6 rounded-2xl transition hover:shadow-lg hover:-translate-y-1 duration-300">
+              <div className="text-4xl mb-4">{item.icon}</div>
+              <h3 className="font-semibold text-lg text-gray-900">{item.title}</h3>
+              <p className="mt-2 text-gray-600 text-sm">{item.desc}</p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+
+===== src\firebase.ts =====
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getDatabase } from "firebase/database";
+import { getFunctions } from "firebase/functions";
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+};
+
+export const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app);
+export const db = getDatabase(app);
+export const functions = getFunctions(app);
+
+
+
+===== src\index.css =====
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, sans-serif;
+  scroll-behavior: smooth;
+}
+
+a, button {
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+}
+
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid #fea142;
+  outline-offset: 2px;
+}
+
+.animate-pulse-once {
+  animation: pulseOnce 0.6s ease-in-out;
+}
+
+
+===== src\lib\directions.ts =====
+export interface RouteResult {
+  path: google.maps.LatLngLiteral[];
+  distanceKm: number;
+  durationMin: number;
+}
+
+export async function fetchRoute(
+  google: typeof window.google,
+  from: [number, number],
+  to: [number, number]
+): Promise<RouteResult | null> {
+  const service = new google.maps.DirectionsService();
+
+  try {
+    const result = await service.route({
+      origin: { lat: from[1], lng: from[0] },
+      destination: { lat: to[1], lng: to[0] },
+      travelMode: google.maps.TravelMode.DRIVING,
+    });
+
+    const route = result.routes[0];
+    const leg = route?.legs[0];
+    if (!route || !leg) return null;
+
+    const path = route.overview_path.map((p) => ({ lat: p.lat(), lng: p.lng() }));
+
+    return {
+      path,
+      distanceKm: Math.round(((leg.distance?.value ?? 0) / 1000) * 10) / 10,
+      durationMin: Math.round((leg.duration?.value ?? 0) / 60),
+    };
+  } catch {
+    return null;
+  }
+}
+
+===== src\lib\drivers.ts =====
+import { ref, onValue, set, update, query, orderByChild, startAt, endAt } from "firebase/database";
+import { geohashForLocation, geohashQueryBounds, distanceBetween } from "geofire-common";
+import { db } from "../firebase";
+
+export type VehicleType = "standard" | "truck" | "vip";
+
+export interface DriverLocation {
+  id: string;
+  lat: number;
+  lng: number;
+  vehicleType: VehicleType;
+  status: "online" | "busy" | "offline";
+  geohash: string;
+}
+
+export async function publishDriverLocation(
+  driverId: string,
+  lat: number,
+  lng: number,
+  vehicleType: VehicleType,
+  status: "online" | "busy" | "offline"
+) {
+  const geohash = geohashForLocation([lat, lng]);
+  const driverRef = ref(db, `drivers/${driverId}`);
+
+  await set(driverRef, {
+    lat,
+    lng,
+    vehicleType,
+    status,
+    geohash,
+    lastUpdated: Date.now(),
+  });
+
+  // Driver stays online in the database until they press "Go offline" themselves.
+  // No auto-offline on disconnect/refresh/crash - fully manual.
+}
+
+export async function goOffline(driverId: string) {
+  await update(ref(db, `drivers/${driverId}`), { status: "offline" });
+}
+
+export function listenNearbyDrivers(
+  centerLat: number,
+  centerLng: number,
+  radiusKm: number,
+  vehicleType: VehicleType | "all",
+  onUpdate: (drivers: DriverLocation[]) => void
+) {
+  const center: [number, number] = [centerLat, centerLng];
+  const radiusInM = radiusKm * 1000;
+  const bounds = geohashQueryBounds(center, radiusInM);
+
+  const unsubscribes: Array<() => void> = [];
+  const driversById = new Map<string, DriverLocation>();
+
+  const emit = () => {
+    const list = Array.from(driversById.values()).filter(
+      (d) => d.status === "online" && (vehicleType === "all" || d.vehicleType === vehicleType)
+    );
+    onUpdate(list);
+  };
+
+  bounds.forEach((b) => {
+    const q = query(ref(db, "drivers"), orderByChild("geohash"), startAt(b[0]), endAt(b[1]));
+    const unsub = onValue(q, (snapshot) => {
+      const data = snapshot.val() || {};
+      Object.entries(data).forEach(([id, val]: [string, any]) => {
+        const distanceInKm = distanceBetween([val.lat, val.lng], center);
+        if (distanceInKm <= radiusKm) {
+          driversById.set(id, { id, ...val });
+        } else {
+          driversById.delete(id);
+        }
+      });
+      emit();
+    });
+    unsubscribes.push(unsub);
+  });
+
+  return () => unsubscribes.forEach((u) => u());
+}
+
+
+
+===== src\lib\fare.ts =====
+import { distanceBetween } from "geofire-common";
+import type { VehicleType } from "./drivers";
+
+interface FareConfig {
+  base: number;
+  perKm: number;
+}
+
+const FARE_TABLE: Record<VehicleType, FareConfig> = {
+  standard: { base: 500, perKm: 300 },
+  truck: { base: 1500, perKm: 600 },
+  vip: { base: 2500, perKm: 900 },
+};
+
+export interface FareEstimate {
+  distanceKm: number;
+  price: number;
+}
+
+export function estimateFare(
+  pickup: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+  vehicleType: VehicleType
+): FareEstimate {
+  const distanceKm = distanceBetween(
+    [pickup.lat, pickup.lng],
+    [destination.lat, destination.lng]
+  );
+  const { base, perKm } = FARE_TABLE[vehicleType];
+  const price = Math.round(base + distanceKm * perKm);
+  return { distanceKm: Math.round(distanceKm * 10) / 10, price };
+}
+
+===== src\lib\geocode.ts =====
+import { loadGoogleMaps } from "./googleMapsLoader";
+
+export interface GeocodeResult {
+  name: string;
+  lat: number;
+  lng: number;
+}
+
+const KIGALI_CENTER = { lat: -1.9441, lng: 30.0619 };
+const KIGALI_RADIUS_M = 40000;
+
+export async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  const google = await loadGoogleMaps();
+  const geocoder = new google.maps.Geocoder();
+
+  return new Promise((resolve) => {
+    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+      if (status !== google.maps.GeocoderStatus.OK || !results || !results[0]) {
+        resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        return;
+      }
+      resolve(results[0].formatted_address);
+    });
+  });
+}
+
+export async function searchPlaces(query: string): Promise<GeocodeResult[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+
+  const google = await loadGoogleMaps();
+  const autocomplete = new google.maps.places.AutocompleteService();
+
+  const predictions = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve) => {
+    autocomplete.getPlacePredictions(
+      {
+        input: trimmed,
+        componentRestrictions: { country: "rw" },
+        locationBias: {
+          center: KIGALI_CENTER,
+          radius: KIGALI_RADIUS_M,
+        } as google.maps.CircleLiteral,
+      },
+      (results, status) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !results) {
+          resolve([]);
+          return;
+        }
+        resolve(results);
+      }
+    );
+  });
+
+  if (predictions.length === 0) return [];
+
+  const placesService = new google.maps.places.PlacesService(document.createElement("div"));
+
+  const details = await Promise.all(
+    predictions.slice(0, 6).map(
+      (pred) =>
+        new Promise<GeocodeResult | null>((resolve) => {
+          placesService.getDetails(
+            { placeId: pred.place_id, fields: ["name", "formatted_address", "geometry"] },
+            (place, status) => {
+              if (status !== google.maps.places.PlacesServiceStatus.OK || !place?.geometry?.location) {
+                resolve(null);
+                return;
+              }
+              resolve({
+                name: place.formatted_address || place.name || pred.description,
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng(),
+              });
+            }
+          );
+        })
+    )
+  );
+
+  return details.filter((d): d is GeocodeResult => d !== null);
+}
+
+===== src\lib\googleMapsLoader.ts =====
+declare global {
+  interface Window {
+    google: typeof google;
+  }
+}
+
+let loadPromise: Promise<typeof google> | null = null;
+
+export function loadGoogleMaps(): Promise<typeof google> {
+  if (loadPromise) return loadPromise;
+
+  loadPromise = new Promise((resolve, reject) => {
+    if (window.google?.maps?.Map) {
+      resolve(window.google);
+      return;
+    }
+    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    if (!key) {
+      reject(new Error("VITE_GOOGLE_MAPS_API_KEY is missing"));
+      return;
+    }
+    const existing = document.getElementById("google-maps-script");
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.google));
+      existing.addEventListener("error", () => reject(new Error("Failed to load Google Maps script")));
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "google-maps-script";
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places`;
+    script.async = true;
+    script.onload = () => resolve(window.google);
+    script.onerror = () => reject(new Error("Failed to load Google Maps script"));
+    document.head.appendChild(script);
+  });
+
+  return loadPromise;
+}
+
+===== src\lib\services.ts =====
+import furnitureImg from "../assets/truck-loading.jpg";
+import taxiImg from "../assets/track-driver.jpg";
+import carImg from "../assets/rental-cars.jpg";
+import vanImg from "../assets/truck-park.jpg";
+import parcelImg from "../assets/track.jpg";
+import fragileImg from "../assets/fragile-service.jpg";
+import boatImg from "../assets/boat-lake-kivu.jpg";
+import removalsImg from "../assets/KIGALI (1).jpg";
+
+export interface ServiceInfo {
+  slug: string;
+  name: string;
+  img: string;
+  description: string;
+}
+
+export const services: ServiceInfo[] = [
+  {
+    slug: "furniture-delivery",
+    name: "Furniture Delivery",
+    img: furnitureImg,
+    description:
+      "Book a verified driver to move sofas, wardrobes, and furniture sets safely to your new home or office in Kigali.",
+  },
+  {
+    slug: "passenger-taxi",
+    name: "Passenger Taxi Ride",
+    img: taxiImg,
+    description:
+      "Get a nearby taxi in minutes for a fast, affordable ride anywhere in Kigali \u2014 live tracked from pickup to drop-off.",
+  },
+  {
+    slug: "car-transport",
+    name: "VIP Car Ride",
+    img: carImg,
+    description:
+      "Prefer more comfort? Book a VIP taxi for extra space, with the same live tracking and Mobile Money payment.",
+  },
+  {
+    slug: "man-and-van",
+    name: "Truck & Van Delivery",
+    img: vanImg,
+    description:
+      "Flexible truck and van delivery for small moves, market goods, or bulky items at fair, distance-based RWF pricing.",
+  },
+  {
+    slug: "parcel-delivery",
+    name: "Parcel & Package Delivery",
+    img: parcelImg,
+    description:
+      "Send documents and packages across Kigali with real-time tracking, from your door to theirs.",
+  },
+  {
+    slug: "fragile-item-transport",
+    name: "Fragile Item Transport",
+    img: fragileImg,
+    description:
+      "Careful handling for delicate or high-value items, from electronics to glassware, by drivers who know how to keep them safe.",
+  },
+  {
+    slug: "boat-transport",
+    name: "Lake Kivu Transport",
+    img: boatImg,
+    description:
+      "Coordinate transport to and from Lake Kivu and other regional destinations with drivers experienced in longer trips.",
+  },
+  {
+    slug: "removals",
+    name: "Home & Office Removals",
+    img: removalsImg,
+    description:
+      "Full home or office moves in Kigali, from a single room to a complete relocation, handled by rated local drivers.",
+  },
+];
+
+
+===== src\lib\trackDriver.ts =====
+import { ref, onValue } from "firebase/database";
+import { db } from "../firebase";
+
+export interface SingleDriverLocation {
+  lat: number;
+  lng: number;
+}
+
+export function listenToDriverLocation(
+  driverId: string,
+  onUpdate: (loc: SingleDriverLocation | null) => void
+) {
+  const driverRef = ref(db, `drivers/${driverId}`);
+  return onValue(driverRef, (snapshot) => {
+    const val = snapshot.val();
+    onUpdate(val ? { lat: val.lat, lng: val.lng } : null);
+  });
+}
+
+
+
+===== src\lib\trips.ts =====
+import { ref, onValue, update, runTransaction, query, orderByChild, startAt, endAt } from "firebase/database";
+import { geohashQueryBounds, distanceBetween } from "geofire-common";
+import { db, app } from "../firebase";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import type { VehicleType } from "./drivers";
+
+export type TripType = "person" | "goods";
+export type TripStatus = "requested" | "accepted" | "in_progress" | "completed" | "cancelled";
+
+export interface TripRequest {
+  id: string;
+  riderId: string;
+  tripType: TripType;
+  vehicleType: VehicleType;
+  pickup: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
+  pickupGeohash: string;
+  distanceKm: number;
+  price: number;
+  status: TripStatus;
+  driverId: string | null;
+  createdAt: number;
+  goodsDescription?: string;
+  paymentStatus?: string;
+  paymentReferenceId?: string;
+}
+
+export async function createTripRequest(
+  _riderId: string,
+  tripType: TripType,
+  vehicleType: VehicleType,
+  pickup: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+  goodsDescription?: string
+) {
+  const functions = getFunctions(app);
+  const createTrip = httpsCallable(functions, "createTrip");
+  const result: any = await createTrip({ tripType, vehicleType, pickup, destination, goodsDescription });
+  return result.data.tripId as string;
+}
+
+export function listenToTrip(tripId: string, onUpdate: (trip: TripRequest | null) => void) {
+  const tripRef = ref(db, `trips/${tripId}`);
+  return onValue(tripRef, (snapshot) => {
+    const val = snapshot.val();
+    onUpdate(val ? { id: tripId, ...val } : null);
+  });
+}
+
+export function listenToOpenTrips(
+  center: { lat: number; lng: number },
+  radiusKm: number,
+  vehicleType: VehicleType,
+  onUpdate: (trips: TripRequest[]) => void
+) {
+  const centerTuple: [number, number] = [center.lat, center.lng];
+  const radiusInM = radiusKm * 1000;
+  const bounds = geohashQueryBounds(centerTuple, radiusInM);
+  const unsubscribes: Array<() => void> = [];
+  const tripsById = new Map<string, TripRequest>();
+
+  const emit = () => {
+    const list = Array.from(tripsById.values()).filter(
+      (t) => t.status === "requested" && t.vehicleType === vehicleType
+    );
+    onUpdate(list);
+  };
+
+  bounds.forEach((b) => {
+    const q = query(ref(db, "trips"), orderByChild("pickupGeohash"), startAt(b[0]), endAt(b[1]));
+    const unsub = onValue(q, (snapshot) => {
+      const data = snapshot.val() || {};
+      Object.entries(data).forEach(([id, val]: [string, any]) => {
+        const distanceInKm = distanceBetween([val.pickup.lat, val.pickup.lng], centerTuple);
+        if (distanceInKm <= radiusKm) {
+          tripsById.set(id, { id, ...val });
+        } else {
+          tripsById.delete(id);
+        }
+      });
+      emit();
+    });
+    unsubscribes.push(unsub);
+  });
+
+  return () => unsubscribes.forEach((u) => u());
+}
+
+export async function acceptTrip(tripId: string, driverId: string): Promise<boolean> {
+  const tripRef = ref(db, `trips/${tripId}`);
+
+  try {
+    const result = await runTransaction(tripRef, (current) => {
+      if (current === null) {
+        return current;
+      }
+      if (current.status !== "requested") {
+        return undefined;
+      }
+      current.status = "accepted";
+      current.driverId = driverId;
+      return current;
+    });
+    return result.committed;
+  } catch (err) {
+    console.error("[acceptTrip] transaction threw:", err);
+    throw err;
+  }
+}
+
+export async function updateTripStatus(tripId: string, status: TripStatus) {
+  await update(ref(db, `trips/${tripId}`), { status });
+}
+
+export async function markCashPayment(tripId: string) {
+  const functions = getFunctions(app);
+  const fn = httpsCallable(functions, "markCashPayment");
+  await fn({ tripId });
+}
+
+export async function completeTrip(tripId: string) {
+  const functions = getFunctions(app);
+  const fn = httpsCallable(functions, "completeTrip");
+  await fn({ tripId });
+}
+
+===== src\main.tsx =====
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import App from './App.tsx'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+
+
+

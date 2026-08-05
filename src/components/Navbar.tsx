@@ -2,6 +2,7 @@
 import { Link, useLocation } from "react-router-dom";
 import type { User } from "firebase/auth";
 import { services } from "../lib/services";
+import { useCart } from "./Cart";
 
 interface NavbarProps {
   user: User | null;
@@ -15,6 +16,7 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
+  const { itemCount } = useCart();
 
   function isActive(path: string) {
     return location.pathname === path;
@@ -114,6 +116,20 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
           </nav>
 
           <div className="flex items-center gap-3">
+            <Link
+              to="/cart"
+              aria-label="Cart"
+              className={`relative flex items-center justify-center min-w-[44px] min-h-[44px] text-slate-100 hover:text-cta transition-colors rounded ${focusRing} focus-visible:ring-offset-slate-800`}
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 1.938-4.716 2.426-7.218a1.125 1.125 0 00-1.11-1.325H5.106M7.5 14.25L5.106 5.25M7.5 14.25L5.25 12M12 15.75h.008v.008H12v-.008z" />
+              </svg>
+              {itemCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-cta text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {itemCount}
+                </span>
+              )}
+            </Link>
             {user ? (
               <>
                 <Link
@@ -162,6 +178,11 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
               ) : (
                 <li><button onClick={onLoginClick} className={`block hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white`}>Log in</button></li>
               )}
+              <li>
+                <Link to="/cart" className={`flex items-center gap-2 hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/cart") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>
+                  Cart{itemCount > 0 ? ` (${itemCount})` : ""}
+                </Link>
+              </li>
               <li><Link to="/ride" className={`block hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/ride") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Book a Ride</Link></li>
               <li><Link to="/driver" className={`block hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/driver") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Drive with TikTak</Link></li>
               <li><a href="/#how" className={`block hover:text-cta py-2 rounded ${focusRing} focus-visible:ring-offset-white`}>How It Works</a></li>

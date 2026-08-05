@@ -1,18 +1,30 @@
-import { useState } from "react";
+﻿import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import LiveMap from "./LiveMap";
 import BookingForm from "./BookingForm";
 import AddressSearch from "./AddressSearch";
 import { publishDriverLocation, type VehicleType } from "../lib/drivers";
-import type { TripRequest } from "../lib/trips";
+import { listenToTrip, type TripRequest } from "../lib/trips";
 import type { GeocodeResult } from "../lib/geocode";
 
 export default function RidePage() {
+  const location = useLocation();
   const [seeding, setSeeding] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
   const [preselectedVehicle, setPreselectedVehicle] = useState<VehicleType | null>(null);
   const [destination, setDestination] = useState<GeocodeResult | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+
+  useEffect(() => {
+    const tripId = (location.state as { tripId?: string } | null)?.tripId;
+    if (!tripId) return;
+    setSheetOpen(true);
+    const unsub = listenToTrip(tripId, (trip) => {
+      setActiveTrip(trip);
+    });
+    return unsub;
+  }, [location.state]);
 
   async function seedTestDrivers() {
     setSeeding(true);
@@ -86,12 +98,28 @@ export default function RidePage() {
             />
           </div>
           <div className="px-4 pb-6">
-            <BookingForm
-              userLocation={userLocation}
-              destination={destination}
-              onTripChange={setActiveTrip}
-              preselectedVehicle={preselectedVehicle}
-            />
+            {activeTrip ? (
+              <div className="space-y-3">
+                <div className="rounded-lg px-4 py-3 text-center font-bold text-base bg-amber-50 text-amber-700">
+                  {activeTrip.status === "requested"
+                    ? "Looking for a nearby driver..."
+                    : activeTrip.status === "accepted"
+                    ? "Driver accepted! On the way to you."
+                    : activeTrip.status === "in_progress"
+                    ? "Trip in progress"
+                    : activeTrip.status}
+                </div>
+                <p className="text-sm text-gray-600 text-center">
+                  {activeTrip.distanceKm} km &middot; {activeTrip.price} RWF
+                </p>
+              </div>
+            ) : (
+              <BookingForm
+                userLocation={userLocation}
+                destination={destination}
+                preselectedVehicle={preselectedVehicle}
+              />
+            )}
           </div>
         </div>
       </div>
