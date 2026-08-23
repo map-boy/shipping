@@ -67,9 +67,21 @@ both parties and leave `trips`, so the driver board stays small.
 
 ## Deploying
 
+On Windows, use the scripts in `scripts/`:
+
+```powershell
+.\scripts\Sync-And-Verify.ps1     # pull, install, typecheck, lint, build
+.\scripts\Deploy.ps1 -SetSecrets  # first deploy: prompts for each secret
+.\scripts\Deploy.ps1              # after that
+.\scripts\Repair-Encoding.ps1     # rewrites any BOM / UTF-16 file as clean UTF-8
+```
+
+Or by hand, in this order — rules before functions, functions before hosting,
+because the new client calls `acceptTrip` / `startTrip` / `cancelTrip`:
+
 ```bash
 npm run verify
-firebase deploy --only database        # rules first
+firebase deploy --only database
 firebase deploy --only functions
 npm run build && firebase deploy --only hosting   # or push to Vercel
 ```
