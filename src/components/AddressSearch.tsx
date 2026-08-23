@@ -15,10 +15,7 @@ export default function AddressSearch({ placeholder, onSelect }: Props) {
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
+    if (!query.trim()) return;
     debounceRef.current = setTimeout(async () => {
       const places = await searchPlaces(query);
       setResults(places);
@@ -29,6 +26,9 @@ export default function AddressSearch({ placeholder, onSelect }: Props) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query]);
+
+  // An empty box shows nothing without having to clear state from inside an effect.
+  const visibleResults = query.trim() ? results : [];
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -53,12 +53,12 @@ export default function AddressSearch({ placeholder, onSelect }: Props) {
         placeholder={placeholder}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => results.length > 0 && setOpen(true)}
+        onFocus={() => visibleResults.length > 0 && setOpen(true)}
         className="w-full border rounded-lg px-3 py-3 text-base"
       />
-      {open && results.length > 0 && (
+      {open && visibleResults.length > 0 && (
         <ul className="absolute z-10 w-full bg-white border rounded mt-1 shadow-lg max-h-60 overflow-y-auto">
-          {results.map((place, i) => (
+          {visibleResults.map((place, i) => (
             <li
               key={i}
               onClick={() => handleSelect(place)}

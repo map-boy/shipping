@@ -1,4 +1,4 @@
-﻿import Hero from "./Hero";
+import Hero from "./Hero";
 import TrustProps from "./TrustProps";
 import HowItWorks from "./HowItWorks";
 import About from "./About";

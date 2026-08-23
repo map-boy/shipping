@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { listenNearbyDrivers, type DriverLocation, type VehicleType } from "../lib/drivers";
 import { listenToDriverLocation } from "../lib/trackDriver";
@@ -133,6 +133,9 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
     return () => {
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     };
+    // Builds the map exactly once. fullScreen only picks the initial control layout and
+    // onLocationChange is a stable setter from the parent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

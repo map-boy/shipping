@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ref, get, set } from "firebase/database";
 import { updateProfile, type User } from "firebase/auth";
 import { db } from "../firebase";
@@ -11,24 +11,30 @@ interface ProfileProps {
 export default function Profile({ user, onLogoutClick }: ProfileProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    const userRef = ref(db, `users/${user.uid}`);
-    get(userRef)
+    if (!user) return;
+    let cancelled = false;
+    get(ref(db, `users/${user.uid}`))
       .then((snap) => {
+        if (cancelled) return;
         const data = snap.val();
         setName(data?.name ?? user.displayName ?? "");
         setPhone(data?.phone ?? "");
       })
-      .finally(() => setLoading(false));
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
+
+  const loading = !!user && !loaded;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();

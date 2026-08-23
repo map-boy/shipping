@@ -1,9 +1,9 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useCart } from "./Cart";
+import { useCart } from "../context/cart";
 import { createTripRequest } from "../lib/trips";
 import { auth } from "../firebase";
-import { useToast } from "./Toast";
+import { useToast } from "../context/toast";
 
 export default function CartPage() {
   const { items, removeFromCart, clearCart, totalPrice } = useCart();
@@ -33,7 +33,6 @@ export default function CartPage() {
       let firstTripId: string | null = null;
       for (const item of items) {
         const tripId = await createTripRequest(
-          auth.currentUser.uid,
           item.tripType,
           item.vehicleType,
           item.pickup,
@@ -49,7 +48,10 @@ export default function CartPage() {
       );
       navigate("/ride", { state: { tripId: firstTripId } });
     } catch (err) {
-      showToast("Could not complete checkout. Please try again.", "error");
+      showToast(
+        err instanceof Error && err.message ? err.message : "Could not complete checkout. Please try again.",
+        "error"
+      );
     } finally {
       setCheckingOut(false);
     }

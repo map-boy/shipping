@@ -1,37 +1,58 @@
-﻿import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import LiveMap from "./LiveMap";
 import BookingForm from "./BookingForm";
 import AddressSearch from "./AddressSearch";
-import { publishDriverLocation, type VehicleType } from "../lib/drivers";
-import { listenToTrip, type TripRequest } from "../lib/trips";
+import PaymentButton from "./PaymentButton";
+import { auth } from "../firebase";
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { listenToActiveTrip, cancelTrip, type TripRequest } from "../lib/trips";
+import type { VehicleType } from "../lib/drivers";
 import type { GeocodeResult } from "../lib/geocode";
+import { useToast } from "../context/toast";
+
+const STATUS_COPY: Record<string, string> = {
+  requested: "Looking for a nearby driver...",
+  accepted: "Driver accepted! On the way to you.",
+  in_progress: "Trip in progress",
+};
 
 export default function RidePage() {
   const location = useLocation();
-  const [seeding, setSeeding] = useState(false);
+  const { showToast } = useToast();
+  const [user, setUser] = useState<User | null>(auth.currentUser);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
+  const [trip, setTrip] = useState<TripRequest | null>(null);
   const [preselectedVehicle, setPreselectedVehicle] = useState<VehicleType | null>(null);
   const [destination, setDestination] = useState<GeocodeResult | null>(null);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(
+    () => !!(location.state as { tripId?: string } | null)?.tripId
+  );
+  const [cancelling, setCancelling] = useState(false);
 
+  useEffect(() => onAuthStateChanged(auth, setUser), []);
+
+  // Follows whatever trip this rider is on, so closing the tab mid-trip and coming
+  // back lands them on the live trip rather than an empty booking form.
   useEffect(() => {
-    const tripId = (location.state as { tripId?: string } | null)?.tripId;
-    if (!tripId) return;
-    setSheetOpen(true);
-    const unsub = listenToTrip(tripId, (trip) => {
-      setActiveTrip(trip);
-    });
-    return unsub;
-  }, [location.state]);
+    if (!user) return;
+    return listenToActiveTrip(user.uid, setTrip);
+  }, [user]);
 
-  async function seedTestDrivers() {
-    setSeeding(true);
-    await publishDriverLocation("driver1", -1.9450, 30.0610, "standard", "online");
-    await publishDriverLocation("driver2", -1.9430, 30.0630, "truck", "online");
-    await publishDriverLocation("driver3", -1.9440, 30.0600, "vip", "online");
-    setSeeding(false);
+  // Logging out must clear the trip view without an extra state reset in an effect.
+  const activeTrip = user ? trip : null;
+
+  async function handleCancel() {
+    if (!activeTrip) return;
+    setCancelling(true);
+    try {
+      await cancelTrip(activeTrip.id);
+      showToast("Trip cancelled.", "success");
+    } catch (err) {
+      showToast(err instanceof Error && err.message ? err.message : "Could not cancel the trip.", "error");
+    } finally {
+      setCancelling(false);
+    }
   }
 
   const trackedDriverId =
@@ -51,7 +72,7 @@ export default function RidePage() {
         fullScreen
       />
 
-      {!trackedDriverId && !activeTrip && (
+      {!activeTrip && (
         <div className="absolute top-16 left-3 right-3 z-20">
           <div className="bg-white rounded-xl shadow-lg p-1">
             <AddressSearch
@@ -63,16 +84,6 @@ export default function RidePage() {
             />
           </div>
         </div>
-      )}
-
-      {import.meta.env.DEV && (
-        <button
-          onClick={seedTestDrivers}
-          disabled={seeding}
-          className="absolute top-3 right-3 z-20 text-xs px-3 py-2 rounded-lg bg-white shadow font-medium text-gray-700"
-        >
-          {seeding ? "Seeding..." : "Seed test drivers"}
-        </button>
       )}
 
       {!sheetOpen && (destination || activeTrip) && (
@@ -101,17 +112,46 @@ export default function RidePage() {
             {activeTrip ? (
               <div className="space-y-3">
                 <div className="rounded-lg px-4 py-3 text-center font-bold text-base bg-amber-50 text-amber-700">
-                  {activeTrip.status === "requested"
-                    ? "Looking for a nearby driver..."
-                    : activeTrip.status === "accepted"
-                    ? "Driver accepted! On the way to you."
-                    : activeTrip.status === "in_progress"
-                    ? "Trip in progress"
-                    : activeTrip.status}
+                  {STATUS_COPY[activeTrip.status] ?? activeTrip.status}
                 </div>
                 <p className="text-sm text-gray-600 text-center">
-                  {activeTrip.distanceKm} km &middot; {activeTrip.price} RWF
+                  {activeTrip.distanceKm} km &middot; {activeTrip.price.toLocaleString()} RWF
                 </p>
+
+                {activeTrip.status === "requested" && (
+                  <button
+                    onClick={handleCancel}
+                    disabled={cancelling}
+                    className="w-full border border-red-300 text-red-600 rounded-lg py-3 text-sm font-semibold disabled:opacity-50"
+                  >
+                    {cancelling ? "Cancelling..." : "Cancel request"}
+                  </button>
+                )}
+
+                {(activeTrip.status === "accepted" || activeTrip.status === "in_progress") &&
+                  activeTrip.paymentStatus !== "cash" && (
+                    <PaymentButton
+                      tripId={activeTrip.id}
+                      amount={activeTrip.price}
+                      paymentStatus={activeTrip.paymentStatus}
+                    />
+                  )}
+
+                {activeTrip.paymentStatus === "cash" && (
+                  <p className="text-center text-sm text-green-700 font-medium">
+                    Your driver marked this trip as paid in cash.
+                  </p>
+                )}
+
+                {activeTrip.status === "accepted" && (
+                  <button
+                    onClick={handleCancel}
+                    disabled={cancelling}
+                    className="w-full border border-red-300 text-red-600 rounded-lg py-3 text-sm font-semibold disabled:opacity-50"
+                  >
+                    {cancelling ? "Cancelling..." : "Cancel trip"}
+                  </button>
+                )}
               </div>
             ) : (
               <BookingForm

@@ -1,23 +1,10 @@
-﻿import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
-
-type ToastKind = "success" | "error" | "info";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ToastContext, type ToastKind } from "../context/toast";
 
 interface ToastItem {
   id: number;
   message: string;
   kind: ToastKind;
-}
-
-interface ToastContextValue {
-  showToast: (message: string, kind?: ToastKind) => void;
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null);
-
-export function useToast() {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error("useToast must be used within ToastProvider");
-  return ctx;
 }
 
 const styles: Record<ToastKind, string> = {
@@ -28,17 +15,30 @@ const styles: Record<ToastKind, string> = {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const timersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => {
+      timers.forEach(clearTimeout);
+      timers.clear();
+    };
+  }, []);
 
   const showToast = useCallback((message: string, kind: ToastKind = "info") => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, kind }]);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
+      timersRef.current.delete(timer);
     }, 3500);
+    timersRef.current.add(timer);
   }, []);
 
+  const value = useMemo(() => ({ showToast }), [showToast]);
+
   return (
-    <ToastContext.Provider value={{ showToast }}>
+    <ToastContext.Provider value={value}>
       {children}
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-[92%] max-w-sm pointer-events-none">
         {toasts.map((t) => (

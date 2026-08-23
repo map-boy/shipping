@@ -1,8 +1,8 @@
-﻿import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import type { User } from "firebase/auth";
 import { services } from "../lib/services";
-import { useCart } from "./Cart";
+import { useCart } from "../context/cart";
 
 interface NavbarProps {
   user: User | null;

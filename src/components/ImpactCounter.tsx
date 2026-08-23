@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Reveal from "./Reveal";
 
 function useCountUp(target: number, duration = 2500) {

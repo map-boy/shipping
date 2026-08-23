@@ -1,13 +1,22 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { publishDriverLocation, goOffline, type VehicleType } from "../lib/drivers";
 import DriverMap from "./DriverMap";
 import { ref, get } from "firebase/database";
-import { db } from "../firebase";
-import { listenToOpenTrips, listenToTrip, acceptTrip, updateTripStatus, markCashPayment, completeTrip, type TripRequest } from "../lib/trips";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
+import {
+  listenToOpenTrips,
+  listenToActiveTrip,
+  acceptTrip,
+  startTrip,
+  cancelTrip,
+  markCashPayment,
+  completeTrip,
+  type OpenTrip,
+  type TripRequest,
+} from "../lib/trips";
 import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
-import { useToast } from "./Toast";
+import { useToast } from "../context/toast";
 
 const VEHICLES: { value: VehicleType; label: string }[] = [
   { value: "standard", label: "Standard" },
@@ -15,35 +24,36 @@ const VEHICLES: { value: VehicleType; label: string }[] = [
   { value: "vip", label: "VIP" },
 ];
 
+const SEARCH_RADIUS_KM = 15;
+
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
+
 function playBeep() {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
-    setTimeout(() => {
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.type = "sine";
-      osc2.frequency.value = 880;
-      gain2.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain2.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
-      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-      osc2.start();
-      osc2.stop(ctx.currentTime + 0.4);
-    }, 450);
+    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+    const ctx = new Ctor();
+    const blip = (offsetSec: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      const at = ctx.currentTime + offsetSec;
+      gain.gain.setValueAtTime(0.001, at);
+      gain.gain.exponentialRampToValueAtTime(0.3, at + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, at + 0.35);
+      osc.start(at);
+      osc.stop(at + 0.4);
+    };
+    blip(0);
+    blip(0.45);
+    setTimeout(() => ctx.close().catch(() => {}), 1200);
   } catch {
-    // ignore if audio not supported
+    // audio unavailable - the on-screen alert still fires
   }
 }
 
@@ -51,21 +61,18 @@ export default function DriverPage() {
   const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(auth.currentUser);
   const [authChecked, setAuthChecked] = useState(false);
-  const [online, setOnline] = useState(() => localStorage.getItem("driverOnline") === "true");
-  const [vehicleType, setVehicleType] = useState<VehicleType>(() => (localStorage.getItem("driverVehicleType") as VehicleType) || "standard");
-  const [resuming, setResuming] = useState(true);
-  const [openTrips, setOpenTrips] = useState<TripRequest[]>([]);
+  const [online, setOnline] = useState(false);
+  const [vehicleType, setVehicleType] = useState<VehicleType>(
+    () => (localStorage.getItem("driverVehicleType") as VehicleType) || "standard"
+  );
+  const [driverLoaded, setDriverLoaded] = useState(false);
+  const [openTrips, setOpenTrips] = useState<OpenTrip[]>([]);
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
-  const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
+  const [trip, setTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [alertTrip, setAlertTrip] = useState<TripRequest | null>(null);
-  const [accepting, setAccepting] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [markingCash, setMarkingCash] = useState(false);
-  const [completing, setCompleting] = useState(false);
-  const watchIdRef = useRef<number | null>(null);
+  const [alertTrip, setAlertTrip] = useState<OpenTrip | null>(null);
+  const [busy, setBusy] = useState<null | "accept" | "start" | "cash" | "complete" | "cancel">(null);
   const knownTripIdsRef = useRef<Set<string>>(new Set());
-  const ignoredTripIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -75,38 +82,60 @@ export default function DriverPage() {
     return unsub;
   }, []);
 
+  // The database is the source of truth for online state, not localStorage: a driver
+  // who went offline on another device must not come back online here on a refresh.
   useEffect(() => {
     if (!user) return;
-    get(ref(db, `drivers/${user.uid}/status`)).then((snap) => {
-      const dbOnline = snap.exists() && snap.val() === "online";
-      setOnline(dbOnline);
-      localStorage.setItem("driverOnline", String(dbOnline));
-      setResuming(false);
-    }).catch(() => setResuming(false));
+    let cancelled = false;
+    get(ref(db, `drivers/${user.uid}`))
+      .then((snap) => {
+        if (cancelled) return;
+        const val = snap.val();
+        setOnline(val?.status === "online");
+        if (val?.vehicleType) setVehicleType(val.vehicleType as VehicleType);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setDriverLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
-
-  useEffect(() => {
-    localStorage.setItem("driverOnline", String(online));
-  }, [online]);
 
   useEffect(() => {
     localStorage.setItem("driverVehicleType", vehicleType);
   }, [vehicleType]);
 
+  // Recover the trip in flight after a refresh, a crash, or a second tab.
   useEffect(() => {
     if (!user) return;
+    return listenToActiveTrip(user.uid, (trip) => {
+      setTrip(trip && trip.driverId === user.uid ? trip : null);
+    });
+  }, [user]);
+
+  // Derived rather than reset from inside an effect: signing out or going offline
+  // simply stops these from rendering.
+  const resuming = !!user && !driverLoaded;
+  const activeTrip = user ? trip : null;
+  const visibleOpenTrips = online && driverPos && !activeTrip ? openTrips : [];
+
+  useEffect(() => {
+    if (!user || resuming) return;
     const driverId = user.uid;
 
     if (!online) {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-      goOffline(driverId);
+      goOffline(driverId).catch(() => undefined);
       return;
     }
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
+    const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         setDriverPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        publishDriverLocation(driverId, pos.coords.latitude, pos.coords.longitude, vehicleType, "online");
+        publishDriverLocation(driverId, pos.coords.latitude, pos.coords.longitude, vehicleType, "online").catch(
+          () => undefined
+        );
       },
       (err) => {
         setError(err.message);
@@ -115,95 +144,62 @@ export default function DriverPage() {
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
     );
 
-    return () => {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-    };
-  }, [online, vehicleType, user]);
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [online, vehicleType, user, resuming, showToast]);
 
   useEffect(() => {
     if (!online || !driverPos || activeTrip) {
-      setOpenTrips([]);
       knownTripIdsRef.current = new Set();
       return;
     }
-    const unsub = listenToOpenTrips(driverPos, 15, vehicleType, (rawTrips) => {
-      const trips = rawTrips.filter((t) => !ignoredTripIdsRef.current.has(t.id));
+    return listenToOpenTrips(driverPos, SEARCH_RADIUS_KM, vehicleType, (trips) => {
       const newOnes = trips.filter((t) => !knownTripIdsRef.current.has(t.id));
+      knownTripIdsRef.current = new Set(trips.map((t) => t.id));
+      setOpenTrips(trips);
       if (newOnes.length > 0) {
         playBeep();
         setAlertTrip(newOnes[0]);
         showToast("New ride request nearby!", "info");
       }
-      knownTripIdsRef.current = new Set(trips.map((t) => t.id));
-      setOpenTrips(trips);
     });
-    return unsub;
-  }, [vehicleType, online, driverPos, activeTrip]);
+  }, [vehicleType, online, driverPos, activeTrip, showToast]);
 
-  async function handleAccept(tripId: string) {
-    if (!user) return;
-    setError(null);
-    setAlertTrip(null);
-    setAccepting(true);
-    ignoredTripIdsRef.current.add(tripId);
-    try {
-      const won = await acceptTrip(tripId, user.uid);
-      if (!won) {
-        showToast("Too slow - another driver already accepted that trip.", "error");
-        return;
+  const handleAccept = useCallback(
+    async (tripId: string) => {
+      setError(null);
+      setAlertTrip(null);
+      setBusy("accept");
+      try {
+        await acceptTrip(tripId);
+        showToast("Trip accepted!", "success");
+        // listenToActiveTrip picks the trip up from here - no extra listener to leak.
+      } catch (err) {
+        showToast(errorMessage(err, "Another driver already took that trip."), "error");
+      } finally {
+        setBusy(null);
       }
-      showToast("Trip accepted!", "success");
-      listenToTrip(tripId, (trip) => {
-        setActiveTrip(trip);
-      });
-    } catch (err: any) {
-      showToast(err.message || "Could not accept the trip.", "error");
-    } finally {
-      setAccepting(false);
-    }
-  }
+    },
+    [showToast]
+  );
 
-  async function handleStartTrip() {
-    if (!activeTrip) return;
-    setStarting(true);
-    try {
-      await updateTripStatus(activeTrip.id, "in_progress");
-      showToast("Trip started.", "success");
-    } catch (err: any) {
-      showToast(err.message || "Could not start the trip.", "error");
-    } finally {
-      setStarting(false);
-    }
-  }
-
-  async function handleMarkCash() {
+  async function runTripAction(
+    kind: "start" | "cash" | "complete" | "cancel",
+    action: (tripId: string) => Promise<void>,
+    success: string,
+    fallback: string
+  ) {
     if (!activeTrip) return;
     setError(null);
-    setMarkingCash(true);
+    setBusy(kind);
     try {
-      await markCashPayment(activeTrip.id);
-      showToast("Marked as paid in cash.", "success");
-    } catch (err: any) {
-      setError(err.message || "Could not mark as paid in cash.");
-      showToast(err.message || "Could not mark as paid in cash.", "error");
+      await action(activeTrip.id);
+      showToast(success, "success");
+    } catch (err) {
+      const message = errorMessage(err, fallback);
+      setError(message);
+      showToast(message, "error");
     } finally {
-      setMarkingCash(false);
-    }
-  }
-
-  async function handleCompleteTrip() {
-    if (!activeTrip) return;
-    setError(null);
-    setCompleting(true);
-    try {
-      await completeTrip(activeTrip.id);
-      showToast("Trip completed! Payment confirmed.", "success");
-      setActiveTrip(null);
-    } catch (err: any) {
-      setError(err.message || "Could not complete trip. Make sure payment is done first.");
-      showToast(err.message || "Could not complete trip. Make sure payment is done first.", "error");
-    } finally {
-      setCompleting(false);
+      setBusy(null);
     }
   }
 
@@ -220,12 +216,14 @@ export default function DriverPage() {
     );
   }
 
+  const paid = activeTrip?.paymentStatus === "successful" || activeTrip?.paymentStatus === "cash";
+
   return (
     <div className="relative w-full h-[calc(100vh-96px)] md:h-[calc(100vh-108px)]">
       {online ? (
         <DriverMap
           driverPos={driverPos}
-          openTrips={openTrips}
+          openTrips={visibleOpenTrips}
           activeTrip={activeTrip}
           onAccept={handleAccept}
           fullScreen
@@ -241,6 +239,7 @@ export default function DriverPage() {
           value={vehicleType}
           onChange={(e) => setVehicleType(e.target.value as VehicleType)}
           disabled={!!activeTrip}
+          aria-label="Vehicle type"
           className="border rounded-lg px-3 py-3 text-base bg-white shadow"
         >
           {VEHICLES.map((v) => (
@@ -251,9 +250,9 @@ export default function DriverPage() {
         <button
           onClick={() => setOnline((v) => !v)}
           disabled={!!activeTrip || resuming}
-          className={`px-4 py-3 rounded-lg font-semibold text-base shadow ${online ? "bg-green-600 text-white" : "bg-white text-gray-800"}`}
+          className={`px-4 py-3 rounded-lg font-semibold text-base shadow disabled:opacity-50 ${online ? "bg-green-600 text-white" : "bg-white text-gray-800"}`}
         >
-          {online ? "Online" : "Go online"}
+          {resuming ? "Loading..." : online ? "Online" : "Go online"}
         </button>
       </div>
 
@@ -261,34 +260,34 @@ export default function DriverPage() {
         <div className="absolute top-20 left-3 right-3 z-20 bg-red-100 text-red-700 text-sm px-3 py-2 rounded-lg shadow">{error}</div>
       )}
 
-      {alertTrip && !activeTrip && (
+      {alertTrip && !activeTrip && online && (
         <div className="absolute inset-0 z-30 bg-black/40 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-3 animate-pulse-once">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-3 animate-pulseOnce">
             <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">New request</p>
             <p className="text-lg font-bold">
               {alertTrip.tripType === "person" ? "Passenger ride" : "Goods delivery"}
             </p>
-            <p className="text-sm text-gray-600">{alertTrip.distanceKm} km &middot; {alertTrip.price} RWF</p>
+            <p className="text-sm text-gray-600">{alertTrip.distanceKm} km &middot; {alertTrip.price.toLocaleString()} RWF</p>
             {alertTrip.goodsDescription && (
               <p className="text-sm text-gray-500">{alertTrip.goodsDescription}</p>
             )}
             <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setAlertTrip(null)}
-                disabled={accepting}
+                disabled={busy === "accept"}
                 className="flex-1 bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300 disabled:opacity-50"
               >
                 Dismiss
               </button>
               <button
                 onClick={() => handleAccept(alertTrip.id)}
-                disabled={accepting}
+                disabled={busy === "accept"}
                 className="flex-1 bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {accepting && (
+                {busy === "accept" && (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {accepting ? "Accepting..." : "Accept"}
+                {busy === "accept" ? "Accepting..." : "Accept"}
               </button>
             </div>
           </div>
@@ -297,29 +296,41 @@ export default function DriverPage() {
 
       {activeTrip && (
         <div className="absolute left-0 right-0 bottom-0 z-20">
-          <div className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] px-4 pt-4 pb-6 space-y-3">
+          <div className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] px-4 pt-4 pb-6 space-y-3 max-h-[70vh] overflow-y-auto">
             <h2 className="font-semibold">Active trip</h2>
             <p className="text-sm font-medium">
               {activeTrip.tripType === "person" ? "Passenger" : "Goods delivery"}
             </p>
-            <p className="text-sm text-gray-600">{activeTrip.distanceKm} km &middot; {activeTrip.price} RWF</p>
+            <p className="text-sm text-gray-600">{activeTrip.distanceKm} km &middot; {activeTrip.price.toLocaleString()} RWF</p>
             {activeTrip.goodsDescription && (
               <p className="text-sm text-gray-500">{activeTrip.goodsDescription}</p>
             )}
-            <p className="text-sm font-medium">Status: {activeTrip.status}</p>
+            <p className="text-sm font-medium">Status: {activeTrip.status.replace("_", " ")}</p>
 
             {activeTrip.status === "accepted" && (
-              <button
-                onClick={handleStartTrip}
-                disabled={starting}
-                className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {starting && (
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                )}
-                {starting ? "Starting..." : "Start trip"}
-              </button>
+              <div className="space-y-2">
+                <button
+                  onClick={() => runTripAction("start", startTrip, "Trip started.", "Could not start the trip.")}
+                  disabled={busy !== null}
+                  className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {busy === "start" && (
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {busy === "start" ? "Starting..." : "Start trip"}
+                </button>
+                <button
+                  onClick={() =>
+                    runTripAction("cancel", cancelTrip, "Trip released back to other drivers.", "Could not cancel the trip.")
+                  }
+                  disabled={busy !== null}
+                  className="w-full border border-red-300 text-red-600 rounded-lg py-3 text-sm font-semibold disabled:opacity-50"
+                >
+                  {busy === "cancel" ? "Cancelling..." : "Can't make it - release trip"}
+                </button>
+              </div>
             )}
+
             {activeTrip.status === "in_progress" && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">
@@ -332,27 +343,36 @@ export default function DriverPage() {
                     ? "Waiting for Mobile Money confirmation..."
                     : "Not paid yet"}
                 </p>
-                {activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash" && (
+                {!paid && (
                   <button
-                    onClick={handleMarkCash}
-                    disabled={markingCash}
+                    onClick={() =>
+                      runTripAction("cash", markCashPayment, "Marked as paid in cash.", "Could not mark as paid in cash.")
+                    }
+                    disabled={busy !== null || activeTrip.paymentStatus === "pending"}
                     className="w-full bg-amber-500 text-white rounded-lg py-3.5 text-base font-semibold active:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    {markingCash && (
+                    {busy === "cash" && (
                       <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     )}
-                    {markingCash ? "Marking..." : "Mark as paid in cash (system down)"}
+                    {busy === "cash" ? "Marking..." : "Mark as paid in cash"}
                   </button>
                 )}
                 <button
-                  onClick={handleCompleteTrip}
-                  disabled={completing || (activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash")}
+                  onClick={() =>
+                    runTripAction(
+                      "complete",
+                      completeTrip,
+                      "Trip completed! Payment confirmed.",
+                      "Could not complete trip. Make sure payment is done first."
+                    )
+                  }
+                  disabled={busy !== null || !paid}
                   className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-green-700 flex items-center justify-center gap-2"
                 >
-                  {completing && (
+                  {busy === "complete" && (
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   )}
-                  {completing ? "Completing..." : "Complete trip"}
+                  {busy === "complete" ? "Completing..." : "Complete trip"}
                 </button>
               </div>
             )}

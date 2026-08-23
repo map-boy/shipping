@@ -1,4 +1,4 @@
-﻿import Reveal from "./Reveal";
+import Reveal from "./Reveal";
 
 const col1 = [
   { q: "Where does TikTak Rwanda operate?", a: "TikTak currently operates across Kigali, with coverage expanding to other Rwandan cities as more drivers join the platform." },

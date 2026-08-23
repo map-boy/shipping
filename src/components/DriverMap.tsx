@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { reverseGeocode } from "../lib/geocode";
 import { fetchRoute } from "../lib/directions";
-import type { TripRequest } from "../lib/trips";
+import type { OpenTrip, TripRequest } from "../lib/trips";
 
 interface Props {
   driverPos: { lat: number; lng: number } | null;
-  openTrips: TripRequest[];
+  openTrips: OpenTrip[];
   activeTrip: TripRequest | null;
   onAccept: (tripId: string) => void;
   fullScreen?: boolean;
@@ -37,6 +37,8 @@ export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept, 
       });
       setReady(true);
     });
+    // Runs once: driverPos is only the initial centre, the marker effect tracks it after that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -106,7 +108,7 @@ export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept, 
         content: `<div style="font-size:13px;min-width:180px;">
           <div style="font-weight:600;margin-bottom:4px;">${trip.tripType === "person" ? "Passenger" : "Goods delivery"}</div>
           <div style="color:#6b7280;margin-bottom:6px;">Loading address...</div>
-          <div style="color:#6b7280;margin-bottom:6px;">${trip.distanceKm} km &middot; ${trip.price} RWF</div>
+          <div style="color:#6b7280;margin-bottom:6px;">${trip.distanceKm} km &middot; ${trip.price.toLocaleString()} RWF</div>
           <button id="accept-${trip.id}" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;width:100%;min-height:44px;">Accept</button>
         </div>`,
       });
