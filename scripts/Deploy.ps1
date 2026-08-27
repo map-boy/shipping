@@ -84,5 +84,12 @@ foreach ($target in $targets) {
 
 Write-Host ''
 Write-Host 'Deploy complete.' -ForegroundColor Green
-Write-Host 'Smoke test: sign in as a rider, book a trip, accept it from a second' -ForegroundColor Gray
-Write-Host 'account on /driver, pay, then complete. The trip should land in tripHistory.' -ForegroundColor Gray
+Write-Host 'Smoke test:' -ForegroundColor Gray
+Write-Host '  1. Sign in as a driver on /driver, go online, pick a vehicle class.' -ForegroundColor Gray
+Write-Host '  2. As a rider, drag the map to set a destination and book Express.' -ForegroundColor Gray
+Write-Host '  3. The offer should reach that one driver only, with a 20s countdown.' -ForegroundColor Gray
+Write-Host '  4. Accept, mark arrived, start, pay, complete.' -ForegroundColor Gray
+Write-Host '  5. Check tripHistory and receipts for both accounts.' -ForegroundColor Gray
+Write-Host ''
+Write-Host 'Reminder: schedule adminDispatchSweep, or first/second class jobs never' -ForegroundColor Yellow
+Write-Host 'get dispatched and stale express requests are never cleared.' -ForegroundColor Yellow

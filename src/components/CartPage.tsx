@@ -32,13 +32,16 @@ export default function CartPage() {
     try {
       let firstTripId: string | null = null;
       for (const item of items) {
-        const tripId = await createTripRequest(
-          item.tripType,
-          item.vehicleType,
-          item.pickup,
-          item.destination,
-          item.goodsDescription
-        );
+        const tripId = await createTripRequest({
+          tripType: item.tripType,
+          vehicleType: item.vehicleType,
+          serviceClass: item.serviceClass,
+          handling: item.handling,
+          pickup: item.pickup,
+          destination: item.destination,
+          goodsDescription: item.goodsDescription,
+          routeDistanceKm: item.distanceKm,
+        });
         if (!firstTripId) firstTripId = tripId;
       }
       clearCart();
@@ -66,7 +69,11 @@ export default function CartPage() {
           <div key={item.id} className="border rounded-2xl p-4 flex justify-between items-start">
             <div>
               <p className="font-medium capitalize">
-                {item.tripType} · {item.vehicleType}
+                {item.tripType} · {item.vehicleType.replace("_", " ")}
+              </p>
+              <p className="text-xs text-gray-500 uppercase tracking-wide">
+                {item.serviceClass}
+                {item.handling !== "ambient" ? ` · ${item.handling}` : ""}
               </p>
               <p className="text-sm text-gray-500">{item.destinationName}</p>
               {item.goodsDescription && (

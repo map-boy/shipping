@@ -2,7 +2,8 @@ import { ref, onValue, set, update, query, orderByChild, startAt, endAt } from "
 import { geohashForLocation, geohashQueryBounds, distanceBetween } from "geofire-common";
 import { db } from "../firebase";
 
-export type VehicleType = "standard" | "truck" | "vip";
+export type { VehicleType } from "./catalog";
+import type { VehicleType } from "./catalog";
 export type DriverStatus = "online" | "busy" | "offline";
 
 /**
@@ -27,13 +28,17 @@ export async function publishDriverLocation(
   lat: number,
   lng: number,
   vehicleType: VehicleType,
-  status: DriverStatus
+  status: DriverStatus,
+  coldChain = false
 ) {
+  // Hot storage: the position is overwritten in place on every ping. Nothing
+  // here is kept as history - trip milestones go to tripEvents instead.
   await set(ref(db, `drivers/${driverId}`), {
     lat,
     lng,
     vehicleType,
     status,
+    coldChain,
     geohash: geohashForLocation([lat, lng]),
     lastUpdated: Date.now(),
   });

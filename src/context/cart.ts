@@ -1,17 +1,19 @@
 import { createContext, useContext } from "react";
-import type { TripType } from "../lib/trips";
-import type { VehicleType } from "../lib/drivers";
+import type { Handling, ServiceClass, TripType, VehicleType } from "../lib/catalog";
 
 export interface CartItem {
   id: string;
   tripType: TripType;
   vehicleType: VehicleType;
+  serviceClass: ServiceClass;
+  handling: Handling;
   pickup: { lat: number; lng: number };
   destination: { lat: number; lng: number };
   destinationName: string;
   goodsDescription?: string;
   distanceKm: number;
   price: number;
+  promisedBy: number;
   addedAt: number;
 }
 

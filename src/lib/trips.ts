@@ -1,28 +1,40 @@
-import { ref, onValue, query, orderByChild, startAt, endAt } from "firebase/database";
-import { geohashQueryBounds, distanceBetween } from "geofire-common";
+import { ref, onValue } from "firebase/database";
 import { db, functions } from "../firebase";
 import { httpsCallable } from "firebase/functions";
-import type { VehicleType } from "./drivers";
+import type { Handling, ServiceClass, TripType, VehicleType } from "./catalog";
+export type { Handling, ServiceClass, TripType, VehicleType } from "./catalog";
+import type { FareQuote } from "./pricing";
 
-export type TripType = "person" | "goods";
-export type TripStatus = "requested" | "accepted" | "in_progress" | "completed" | "cancelled";
-export type PaymentStatus = "pending" | "successful" | "failed" | "cash";
+export type TripStatus = "requested" | "accepted" | "in_progress" | "completed" | "cancelled" | "expired";
+export type PaymentStatus = "pending" | "successful" | "failed" | "cash" | "outstanding";
 
 export interface TripRequest {
   id: string;
   riderId: string;
   tripType: TripType;
   vehicleType: VehicleType;
+  serviceClass: ServiceClass;
+  handling: Handling;
   pickup: { lat: number; lng: number };
   destination: { lat: number; lng: number };
   pickupGeohash: string;
+  areaKey: string;
   distanceKm: number;
+  durationMin: number;
   price: number;
+  fare?: FareQuote;
   status: TripStatus;
   driverId: string | null;
+  offeredTo?: string | null;
+  offerExpiresAt?: number | null;
+  offerRound?: number;
+  etaToPickupMin?: number;
   createdAt: number;
+  promisedFrom?: number;
+  promisedBy?: number;
   expiresAt?: number;
   acceptedAt?: number;
+  arrivedAt?: number;
   startedAt?: number;
   goodsDescription?: string;
   paymentStatus?: PaymentStatus;
@@ -30,19 +42,18 @@ export interface TripRequest {
   paymentAmount?: number;
 }
 
-/**
- * What a driver sees on the open board. Deliberately narrower than TripRequest:
- * the rider's identity and drop-off address are not published until the job is taken.
- */
-export interface OpenTrip {
-  id: string;
+/** A job offered privately to one driver. Never visible to any other driver. */
+export interface DriverOffer {
+  tripId: string;
   tripType: TripType;
   vehicleType: VehicleType;
+  serviceClass: ServiceClass;
+  handling: Handling;
   pickup: { lat: number; lng: number };
-  pickupGeohash: string;
+  pickupDistanceKm: number;
+  etaMin: number;
   distanceKm: number;
   price: number;
-  createdAt: number;
   expiresAt: number;
   goodsDescription?: string;
 }
@@ -51,22 +62,28 @@ function call<TReq extends object, TRes>(name: string) {
   return httpsCallable<TReq, TRes>(functions, name);
 }
 
-export async function createTripRequest(
-  tripType: TripType,
-  vehicleType: VehicleType,
-  pickup: { lat: number; lng: number },
-  destination: { lat: number; lng: number },
-  goodsDescription?: string
-): Promise<string> {
-  const createTrip = call<object, { tripId: string; distanceKm: number; price: number }>("createTrip");
-  const result = await createTrip({ tripType, vehicleType, pickup, destination, goodsDescription });
+export interface CreateTripInput {
+  tripType: TripType;
+  vehicleType: VehicleType;
+  serviceClass: ServiceClass;
+  handling: Handling;
+  pickup: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
+  goodsDescription?: string;
+  routeDistanceKm?: number;
+  routeDurationMin?: number;
+}
+
+export async function createTripRequest(input: CreateTripInput): Promise<string> {
+  const result = await call<CreateTripInput, { tripId: string; price: number; offered: boolean }>(
+    "createTrip"
+  )(input);
   return result.data.tripId;
 }
 
 export function listenToTrip(tripId: string, onUpdate: (trip: TripRequest | null) => void) {
-  const tripRef = ref(db, `trips/${tripId}`);
   return onValue(
-    tripRef,
+    ref(db, `trips/${tripId}`),
     (snapshot) => {
       const val = snapshot.val();
       onUpdate(val ? { id: tripId, ...val } : null);
@@ -75,10 +92,7 @@ export function listenToTrip(tripId: string, onUpdate: (trip: TripRequest | null
   );
 }
 
-/**
- * Follows whichever trip this user is currently on, so a refresh or a fresh tab
- * drops them straight back into the live trip instead of an empty screen.
- */
+/** Reconnects either party to the trip they are on after a refresh or a new tab. */
 export function listenToActiveTrip(uid: string, onUpdate: (trip: TripRequest | null) => void) {
   let unsubTrip: (() => void) | null = null;
 
@@ -103,50 +117,55 @@ export function listenToActiveTrip(uid: string, onUpdate: (trip: TripRequest | n
   };
 }
 
-export function listenToOpenTrips(
-  center: { lat: number; lng: number },
-  radiusKm: number,
-  vehicleType: VehicleType,
-  onUpdate: (trips: OpenTrip[]) => void
-) {
-  const centerTuple: [number, number] = [center.lat, center.lng];
-  const bounds = geohashQueryBounds(centerTuple, radiusKm * 1000);
-  const unsubscribes: Array<() => void> = [];
-  // One bucket per geohash bound. Each snapshot replaces its own bucket wholesale,
-  // so a trip another driver just took vanishes instead of lingering in the list.
-  const buckets: Array<Map<string, OpenTrip>> = bounds.map(() => new Map());
+/**
+ * A driver watches only their own offers. There is no shared job board to read,
+ * so no driver can see work that was not ranked to them.
+ */
+export function listenToMyOffers(driverId: string, onUpdate: (offers: DriverOffer[]) => void) {
+  const unsub = onValue(
+    ref(db, `driverOffers/${driverId}`),
+    (snapshot) => {
+      const data = (snapshot.val() || {}) as Record<string, DriverOffer>;
+      const now = Date.now();
+      onUpdate(Object.values(data).filter((o) => o.expiresAt > now));
+    },
+    () => onUpdate([])
+  );
 
-  const emit = () => {
-    const now = Date.now();
-    const merged = new Map<string, OpenTrip>();
-    buckets.forEach((bucket) => bucket.forEach((trip, id) => merged.set(id, trip)));
-    const list = Array.from(merged.values())
-      .filter((t) => t.vehicleType === vehicleType && t.expiresAt > now)
-      .sort((a, b) => a.createdAt - b.createdAt);
-    onUpdate(list);
+  // Offers lapse on a clock, not on a write, so re-filter as they age out.
+  const timer = setInterval(() => {
+    onValue(
+      ref(db, `driverOffers/${driverId}`),
+      (snapshot) => {
+        const data = (snapshot.val() || {}) as Record<string, DriverOffer>;
+        const now = Date.now();
+        onUpdate(Object.values(data).filter((o) => o.expiresAt > now));
+      },
+      { onlyOnce: true }
+    );
+  }, 5000);
+
+  return () => {
+    clearInterval(timer);
+    unsub();
   };
-
-  bounds.forEach((b, index) => {
-    const q = query(ref(db, "openTrips"), orderByChild("pickupGeohash"), startAt(b[0]), endAt(b[1]));
-    const unsub = onValue(q, (snapshot) => {
-      const data = (snapshot.val() || {}) as Record<string, Omit<OpenTrip, "id">>;
-      const bucket = new Map<string, OpenTrip>();
-      Object.entries(data).forEach(([id, val]) => {
-        if (distanceBetween([val.pickup.lat, val.pickup.lng], centerTuple) <= radiusKm) {
-          bucket.set(id, { id, ...val });
-        }
-      });
-      buckets[index] = bucket;
-      emit();
-    });
-    unsubscribes.push(unsub);
-  });
-
-  return () => unsubscribes.forEach((u) => u());
 }
 
 export async function acceptTrip(tripId: string): Promise<void> {
-  await call<{ tripId: string }, { ok: true; tripId: string }>("acceptTrip")({ tripId });
+  await call<{ tripId: string }, { ok: true }>("acceptTrip")({ tripId });
+}
+
+export async function declineOffer(tripId: string): Promise<void> {
+  await call<{ tripId: string }, { ok: true; reoffered: boolean }>("declineOffer")({ tripId });
+}
+
+/** Nudges a stalled offer on to the next driver. Safe to call repeatedly. */
+export async function dispatchTick(tripId: string): Promise<void> {
+  await call<{ tripId: string }, { ok: true; advanced: boolean }>("dispatchTick")({ tripId });
+}
+
+export async function arriveAtPickup(tripId: string): Promise<void> {
+  await call<{ tripId: string }, { ok: true }>("arriveAtPickup")({ tripId });
 }
 
 export async function startTrip(tripId: string): Promise<void> {
@@ -162,5 +181,5 @@ export async function markCashPayment(tripId: string): Promise<void> {
 }
 
 export async function completeTrip(tripId: string): Promise<void> {
-  await call<{ tripId: string }, { ok: true; completedAt: number }>("completeTrip")({ tripId });
+  await call<{ tripId: string }, { ok: true; settled: boolean }>("completeTrip")({ tripId });
 }

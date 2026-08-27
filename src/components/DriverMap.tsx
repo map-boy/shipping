@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { reverseGeocode } from "../lib/geocode";
 import { fetchRoute } from "../lib/directions";
-import type { OpenTrip, TripRequest } from "../lib/trips";
+import type { DriverOffer, TripRequest } from "../lib/trips";
 
 interface Props {
   driverPos: { lat: number; lng: number } | null;
-  openTrips: OpenTrip[];
+  openTrips: DriverOffer[];
   activeTrip: TripRequest | null;
   onAccept: (tripId: string) => void;
   fullScreen?: boolean;
@@ -77,7 +77,7 @@ export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept, 
       return;
     }
 
-    const currentIds = new Set(openTrips.map((t) => t.id));
+    const currentIds = new Set(openTrips.map((t) => t.tripId));
     tripMarkersRef.current.forEach((marker, id) => {
       if (!currentIds.has(id)) {
         marker.setMap(null);
@@ -88,7 +88,7 @@ export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept, 
     });
 
     openTrips.forEach((trip) => {
-      if (tripMarkersRef.current.has(trip.id)) return;
+      if (tripMarkersRef.current.has(trip.tripId)) return;
 
       const marker = new google.maps.Marker({
         position: trip.pickup,
@@ -109,7 +109,7 @@ export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept, 
           <div style="font-weight:600;margin-bottom:4px;">${trip.tripType === "person" ? "Passenger" : "Goods delivery"}</div>
           <div style="color:#6b7280;margin-bottom:6px;">Loading address...</div>
           <div style="color:#6b7280;margin-bottom:6px;">${trip.distanceKm} km &middot; ${trip.price.toLocaleString()} RWF</div>
-          <button id="accept-${trip.id}" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;width:100%;min-height:44px;">Accept</button>
+          <button id="accept-${trip.tripId}" style="background:#2563eb;color:white;border:none;border-radius:8px;padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;width:100%;min-height:44px;">Accept</button>
         </div>`,
       });
 
@@ -123,14 +123,14 @@ export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept, 
       });
 
       infoWindow.addListener("domready", () => {
-        document.getElementById(`accept-${trip.id}`)?.addEventListener("click", () => {
-          onAccept(trip.id);
+        document.getElementById(`accept-${trip.tripId}`)?.addEventListener("click", () => {
+          onAccept(trip.tripId);
           infoWindow.close();
         });
       });
 
-      tripMarkersRef.current.set(trip.id, marker);
-      tripInfoWindowsRef.current.set(trip.id, infoWindow);
+      tripMarkersRef.current.set(trip.tripId, marker);
+      tripInfoWindowsRef.current.set(trip.tripId, infoWindow);
     });
   }, [ready, openTrips, activeTrip, onAccept]);
 
@@ -197,7 +197,7 @@ export default function DriverMap({ driverPos, openTrips, activeTrip, onAccept, 
       )}
       {!activeTrip && openTrips.length === 0 && (
         <div className="absolute top-2 left-2 bg-white shadow px-3 py-1.5 rounded-lg text-sm text-gray-500">
-          Waiting for requests...
+          Waiting for a job offer...
         </div>
       )}
     </div>
