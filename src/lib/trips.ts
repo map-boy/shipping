@@ -40,6 +40,19 @@ export interface TripRequest {
   paymentStatus?: PaymentStatus;
   paymentReferenceId?: string;
   paymentAmount?: number;
+  deliveryCode?: string;
+  deliveryConfirmedAt?: number;
+  recipientName?: string | null;
+}
+
+export interface DriverStats {
+  activeTripId?: string | null;
+  rating?: number;
+  ratingCount?: number;
+  offersReceived?: number;
+  offersAccepted?: number;
+  completedTrips?: number;
+  onTimeTrips?: number;
 }
 
 /** A job offered privately to one driver. Never visible to any other driver. */
@@ -182,4 +195,31 @@ export async function markCashPayment(tripId: string): Promise<void> {
 
 export async function completeTrip(tripId: string): Promise<void> {
   await call<{ tripId: string }, { ok: true; settled: boolean }>("completeTrip")({ tripId });
+}
+
+/** Driver produces the recipient's code before a goods job can be closed. */
+export async function confirmDelivery(
+  tripId: string,
+  code: string,
+  recipientName?: string
+): Promise<void> {
+  await call<{ tripId: string; code: string; recipientName?: string }, { ok: true }>(
+    "confirmDelivery"
+  )({ tripId, code, recipientName });
+}
+
+export async function rateTrip(tripId: string, score: number, comment?: string): Promise<void> {
+  await call<{ tripId: string; score: number; comment?: string }, { ok: true }>("rateTrip")({
+    tripId,
+    score,
+    comment,
+  });
+}
+
+export function listenToDriverStats(driverId: string, onUpdate: (stats: DriverStats) => void) {
+  return onValue(
+    ref(db, `driverStats/${driverId}`),
+    (snapshot) => onUpdate((snapshot.val() || {}) as DriverStats),
+    () => onUpdate({})
+  );
 }

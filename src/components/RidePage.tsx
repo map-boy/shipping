@@ -182,6 +182,18 @@ export default function RidePage() {
                   </p>
                 )}
 
+                {activeTrip.deliveryCode && activeTrip.status !== "requested" && (
+                  <div className="rounded-lg border border-gray-200 p-3 text-center">
+                    <p className="text-xs uppercase tracking-wide text-gray-500">Delivery code</p>
+                    <p className="text-3xl font-bold tracking-[0.3em] mt-1">{activeTrip.deliveryCode}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {activeTrip.deliveryConfirmedAt
+                        ? "Confirmed by the driver."
+                        : "Give this to the driver only when the goods arrive."}
+                    </p>
+                  </div>
+                )}
+
                 {(activeTrip.status === "requested" || activeTrip.status === "accepted") && (
                   <button
                     onClick={handleCancel}

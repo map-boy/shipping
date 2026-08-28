@@ -41,6 +41,12 @@ export { marketConditions } from "./marketplace";
 // Payments
 export { requestMomoPayment, checkMomoPaymentStatus, markCashPayment } from "./payment";
 
+// Trust: ratings and proof of delivery
+export { rateTrip, confirmDelivery } from "./trust";
+
+// Scheduled dispatch upkeep
+export { dispatchSweep, offerCleanup } from "./scheduled";
+
 // Event fan-out
 export { onTripEvent } from "./consumers";
 

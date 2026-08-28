@@ -1,4 +1,4 @@
-import { ref, onValue, set, update, query, orderByChild, startAt, endAt } from "firebase/database";
+import { ref, onValue, update, query, orderByChild, startAt, endAt } from "firebase/database";
 import { geohashForLocation, geohashQueryBounds, distanceBetween } from "geofire-common";
 import { db } from "../firebase";
 
@@ -33,7 +33,9 @@ export async function publishDriverLocation(
 ) {
   // Hot storage: the position is overwritten in place on every ping. Nothing
   // here is kept as history - trip milestones go to tripEvents instead.
-  await set(ref(db, `drivers/${driverId}`), {
+  // update, not set: server-owned facts live in driverStats, but a full
+  // overwrite here would still be the wrong shape to reach for.
+  await update(ref(db, `drivers/${driverId}`), {
     lat,
     lng,
     vehicleType,

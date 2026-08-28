@@ -2,8 +2,8 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { timingSafeEqual } from "crypto";
 import { db } from "./lib/db";
 import { requireString } from "./lib/validate";
-import { buildOfferUpdates, clearDispatchUpdates } from "./dispatch";
-import { tripEventUpdate } from "./lib/events";
+import { clearDispatchUpdates } from "./dispatch";
+import { sweepDispatch } from "./scheduled";
 
 function safeEquals(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "utf8");
@@ -118,55 +118,8 @@ export const adminSetDriverStatus = onCall(async (request) => {
   return { ok: true };
 });
 
-/**
- * Sweeps the dispatch queue: expires dead requests, advances stalled offers, and
- * releases scheduled (first/second class) work once its window opens. Point a
- * scheduler at this, or call it by hand.
- */
+/** Manual trigger for the same sweep the scheduler runs every two minutes. */
 export const adminDispatchSweep = onCall(async (request) => {
   guard(request);
-  const now = Date.now();
-  const snap = await db.ref("trips").get();
-  const trips = (snap.val() || {}) as Record<string, Record<string, unknown>>;
-
-  let expired = 0;
-  let advanced = 0;
-
-  for (const [tripId, trip] of Object.entries(trips)) {
-    if (trip.status !== "requested") continue;
-
-    const expiresAt = trip.expiresAt as number | undefined;
-    const promisedFrom = trip.promisedFrom as number | undefined;
-    const offerExpiresAt = trip.offerExpiresAt as number | undefined;
-    const serviceClass = trip.serviceClass as string | undefined;
-
-    if (serviceClass === "express" && typeof expiresAt === "number" && expiresAt < now) {
-      const record = { ...trip, status: "expired", completedAt: now };
-      await db.ref().update({
-        [`trips/${tripId}`]: null,
-        [`openDemand/${tripId}`]: null,
-        [`tripHistory/${trip.riderId as string}/${tripId}`]: record,
-        [`activeTrips/${trip.riderId as string}`]: null,
-        ...clearDispatchUpdates(tripId, trip),
-        ...tripEventUpdate(tripId, { type: "offer_expired", at: now, data: { reason: "request-ttl" } }),
-      });
-      expired += 1;
-      continue;
-    }
-
-    // Scheduled classes wait until their window opens before tying up a driver.
-    const dueNow = serviceClass === "express" || (typeof promisedFrom === "number" && promisedFrom <= now);
-    if (!dueNow) continue;
-
-    const offerLive = typeof offerExpiresAt === "number" && offerExpiresAt > now;
-    if (offerLive) continue;
-
-    const next = await buildOfferUpdates(tripId, trip as never);
-    if (next) {
-      await db.ref().update(next);
-      advanced += 1;
-    }
-  }
-
-  return { expired, advanced, scanned: Object.keys(trips).length };
+  return await sweepDispatch();
 });

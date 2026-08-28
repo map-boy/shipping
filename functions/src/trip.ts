@@ -10,6 +10,7 @@ import { refreshMarket } from "./marketplace";
 import { buildOfferUpdates, clearDispatchUpdates } from "./dispatch";
 import { tripEventUpdate } from "./lib/events";
 import { REQUEST_TTL_MS } from "./lib/constants";
+import { ServerValue } from "firebase-admin/database";
 
 async function assertNotBanned(uid: string) {
   const banned = await db.ref(`bannedUsers/${uid}`).get();
@@ -85,6 +86,12 @@ export const createTrip = onCall(async (request) => {
 
   const tripId = db.ref("trips").push().key as string;
 
+  // Goods the sender is not travelling with need proof they reached the right
+  // hands. The rider sees this code; the driver must produce it to close the job.
+  const deliveryCode = tripType === "goods"
+    ? String(Math.floor(1000 + Math.random() * 9000))
+    : null;
+
   const trip = {
     riderId: uid,
     tripType,
@@ -107,6 +114,7 @@ export const createTrip = onCall(async (request) => {
     promisedFrom: fare.promisedFrom,
     promisedBy: fare.promisedBy,
     expiresAt: createdAt + REQUEST_TTL_MS,
+    ...(deliveryCode ? { deliveryCode } : {}),
     ...(description ? { goodsDescription: description } : {}),
   };
 
@@ -161,8 +169,8 @@ export const acceptTrip = onCall(async (request) => {
   await assertNotBanned(uid);
   const tripId = requireString(request.data?.tripId, "tripId");
 
-  const driverSnap = await db.ref(`drivers/${uid}`).get();
-  if (driverSnap.val()?.activeTripId) {
+  const statsSnap = await db.ref(`driverStats/${uid}/activeTripId`).get();
+  if (statsSnap.val()) {
     throw new HttpsError("failed-precondition", "Finish your current trip before accepting another.");
   }
 
@@ -195,7 +203,8 @@ export const acceptTrip = onCall(async (request) => {
     [`driverOffers/${uid}/${tripId}`]: null,
     [`openDemand/${tripId}`]: null,
     [`activeTrips/${uid}`]: tripId,
-    [`drivers/${uid}/activeTripId`]: tripId,
+    [`driverStats/${uid}/activeTripId`]: tripId,
+    [`driverStats/${uid}/offersAccepted`]: ServerValue.increment(1),
   };
   Object.assign(updates, tripEventUpdate(tripId, { type: "accepted", at: now, actorId: uid }));
 
@@ -355,7 +364,7 @@ export const cancelTrip = onCall(async (request) => {
     };
     await db.ref().update({
       [`trips/${tripId}`]: released,
-      [`drivers/${uid}/activeTripId`]: null,
+      [`driverStats/${uid}/activeTripId`]: null,
       [`activeTrips/${uid}`]: null,
       [`openDemand/${tripId}`]: { areaKey: trip.areaKey, vehicleType: trip.vehicleType, serviceClass: trip.serviceClass, createdAt: trip.createdAt },
       ...tripEventUpdate(tripId, { type: "cancelled", at: now, actorId: uid, data: { by: "driver", requeued: true } }),
@@ -377,7 +386,7 @@ export const cancelTrip = onCall(async (request) => {
   if (trip.driverId) {
     updates[`tripHistory/${trip.driverId}/${tripId}`] = record;
     updates[`activeTrips/${trip.driverId}`] = null;
-    updates[`drivers/${trip.driverId}/activeTripId`] = null;
+    updates[`driverStats/${trip.driverId}/activeTripId`] = null;
   }
 
   await db.ref().update(updates);
@@ -394,6 +403,13 @@ export const completeTrip = onCall(async (request) => {
   }
   if (trip.status !== "in_progress") {
     throw new HttpsError("failed-precondition", "Trip must be in progress to complete.");
+  }
+  // Goods carry a delivery code; the driver must have produced it first.
+  if (trip.deliveryCode && !trip.deliveryConfirmedAt) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Enter the recipient's delivery code before closing this job."
+    );
   }
 
   const now = Date.now();
@@ -417,7 +433,9 @@ export const completeTrip = onCall(async (request) => {
     [`tripHistory/${uid}/${tripId}`]: record,
     [`activeTrips/${trip.riderId}`]: null,
     [`activeTrips/${uid}`]: null,
-    [`drivers/${uid}/activeTripId`]: null,
+    [`driverStats/${uid}/activeTripId`]: null,
+    [`driverStats/${uid}/completedTrips`]: ServerValue.increment(1),
+    ...(record.onTime ? { [`driverStats/${uid}/onTimeTrips`]: ServerValue.increment(1) } : {}),
     ...clearDispatchUpdates(tripId, trip),
     ...tripEventUpdate(tripId, {
       type: "completed",

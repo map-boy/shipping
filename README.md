@@ -92,6 +92,7 @@ to `trips`, which is why the rules deny client writes outright.
 | --- | --- | --- |
 | `users/{uid}` | that user | that user |
 | `drivers/{driverId}` | any signed-in user | that driver, shape-validated |
+| `driverStats/{driverId}` | that driver | server only |
 | `driverOffers/{driverId}` | that driver only | server only |
 | `openDemand/{tripId}` | nobody | server only |
 | `marketplace/{areaKey}` | any signed-in user | server only |
@@ -100,6 +101,7 @@ to `trips`, which is why the rules deny client writes outright.
 | `activeTrips/{uid}` | that user | server only |
 | `tripHistory/{uid}` | that user | server only |
 | `receipts/{uid}` | that user | server only |
+| `ratings/{tripId}` | any signed-in user | server only |
 | `notifications/{uid}` | that user | server writes; owner may flip `read` |
 | `analytics`, `bannedUsers` | nobody | server only |
 
@@ -138,6 +140,12 @@ createTrip → requested ──offer──▶ (one driver, 20s)
 amount is carried as `paymentStatus: "outstanding"`. A Mobile Money outage
 cannot trap a driver in a finished job.
 
+## CI
+
+`.github/workflows/verify.yml` runs typecheck, lint and build for the web app,
+typecheck and build for the functions, and validates `database.rules.json` plus
+a BOM/UTF-16 check on every pull request.
+
 ## Deploying
 
 ```powershell
@@ -173,21 +181,39 @@ Realtime Database instance or you trade client latency for database latency.
 
 `FUNCTIONS_MAX_INSTANCES` (default 40) is sized for peak, not average load.
 
-## Scheduling the sweep
+## Scheduled upkeep
 
-`adminDispatchSweep` expires dead express requests, advances stalled offers, and
-releases first/second class work once its window opens. Nothing calls it
-automatically — point Cloud Scheduler at it, or run it from the admin tooling.
-Without it, scheduled-class jobs are never dispatched.
+`dispatchSweep` runs every two minutes and `offerCleanup` every ten. Between
+them they expire dead express requests, advance offers whose holder went quiet,
+release first/second class work once its promised window opens, and clear lapsed
+offer records. `adminDispatchSweep` runs the same sweep on demand.
+
+These are `onSchedule` functions, so `firebase deploy --only functions`
+provisions the Cloud Scheduler jobs for you. They need the Blaze plan, as do all
+v2 functions.
+
+## Trust
+
+Both parties can rate a completed trip with `rateTrip`. Rider-on-driver scores
+feed `driverStats/{driverId}.rating`, which the dispatcher ranks on, and only
+count once a driver has at least three ratings. `driverStats` is a separate node
+from `drivers` precisely because the driver's own client writes `drivers` on
+every GPS ping — a driver can never write their own rating, and a position
+update can never overwrite one.
+
+Goods trips carry a four-digit delivery code. The sender sees it in their app;
+the driver must enter it via `confirmDelivery` before `completeTrip` will close
+the job. Passenger trips have no code — the rider is present.
 
 ## Known limits
 
 - Ranking uses a straight-line ETA at an assumed 22 km/h, not live traffic.
   Road-network ETA is fetched in the client maps but does not yet feed ranking.
-- Driver `rating` and `acceptRate` are read by the ranker but nothing writes
-  them yet, so every driver currently scores on distance alone.
+- A new driver ranks on distance alone until they have three ratings and five
+  offers behind them; before that the defaults apply.
 - A driver stays `online` until they tap "Go offline". Riders stop seeing them
   after 90 seconds without a position update.
 - Cash payment is recorded on the driver's word. There is no reconciliation.
-- The offer watchdog runs in the rider's browser. If the rider closes the app
-  mid-search, offers only advance when the sweep next runs.
+- The offer watchdog runs in the rider's browser for fast hand-off; if the rider
+  closes the app mid-search, the two-minute sweep picks it up instead.
+- Ratings are per trip and unweighted — no recency decay, no fraud checks.

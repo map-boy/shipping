@@ -2,57 +2,84 @@
   "rules": {
     ".read": false,
     ".write": false,
-
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid",
-        "name": { ".validate": "newData.isString() && newData.val().length <= 100" },
-        "phone": { ".validate": "newData.isString() && newData.val().length <= 20" },
-        "email": { ".validate": "newData.isString() && newData.val().length <= 254" },
-        "updatedAt": { ".validate": "newData.isNumber()" },
-        "$other": { ".validate": false }
+        "name": {
+          ".validate": "newData.isString() && newData.val().length <= 100"
+        },
+        "phone": {
+          ".validate": "newData.isString() && newData.val().length <= 20"
+        },
+        "email": {
+          ".validate": "newData.isString() && newData.val().length <= 254"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     },
-
     "drivers": {
       ".read": "auth != null",
-      ".indexOn": ["geohash"],
+      ".indexOn": [
+        "geohash"
+      ],
       "$driverId": {
-        ".write": "auth != null && auth.uid === $driverId && !newData.child('activeTripId').exists()",
+        ".write": "auth != null && auth.uid === $driverId",
         ".validate": "newData.hasChildren(['lat', 'lng', 'vehicleType', 'status', 'geohash', 'lastUpdated'])",
-        "lat": { ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90" },
-        "lng": { ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180" },
-        "vehicleType": { ".validate": "newData.val() === 'standard' || newData.val() === 'car_hire' || newData.val() === 'bus' || newData.val() === 'truck' || newData.val() === 'vip'" },
-        "status": { ".validate": "newData.val() === 'online' || newData.val() === 'busy' || newData.val() === 'offline'" },
-        "geohash": { ".validate": "newData.isString() && newData.val().length <= 12" },
-        "lastUpdated": { ".validate": "newData.isNumber()" },
-        "coldChain": { ".validate": "newData.isBoolean()" },
-        "rating": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5" },
-        "acceptRate": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1" },
-        "activeTripId": { ".validate": "newData.isString()" },
-        "$other": { ".validate": false }
+        "lat": {
+          ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+        },
+        "lng": {
+          ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+        },
+        "vehicleType": {
+          ".validate": "newData.val() === 'standard' || newData.val() === 'car_hire' || newData.val() === 'bus' || newData.val() === 'truck' || newData.val() === 'vip'"
+        },
+        "status": {
+          ".validate": "newData.val() === 'online' || newData.val() === 'busy' || newData.val() === 'offline'"
+        },
+        "geohash": {
+          ".validate": "newData.isString() && newData.val().length <= 12"
+        },
+        "lastUpdated": {
+          ".validate": "newData.isNumber()"
+        },
+        "coldChain": {
+          ".validate": "newData.isBoolean()"
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     },
-
+    "driverStats": {
+      "$driverId": {
+        ".read": "auth != null && auth.uid === $driverId",
+        ".write": false
+      }
+    },
     "driverOffers": {
       "$driverId": {
         ".read": "auth != null && auth.uid === $driverId",
         ".write": false
       }
     },
-
     "openDemand": {
       ".read": false,
       ".write": false,
-      ".indexOn": ["areaKey"]
+      ".indexOn": [
+        "areaKey"
+      ]
     },
-
     "marketplace": {
       ".read": "auth != null",
       ".write": false
     },
-
     "trips": {
       ".read": false,
       ".write": false,
@@ -61,40 +88,39 @@
         ".write": false
       }
     },
-
     "tripEvents": {
       "$tripId": {
         ".read": "auth != null && (root.child('trips').child($tripId).child('riderId').val() === auth.uid || root.child('trips').child($tripId).child('driverId').val() === auth.uid || root.child('tripHistory').child(auth.uid).child($tripId).exists())",
         ".write": false
       }
     },
-
     "activeTrips": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": false
       }
     },
-
     "tripHistory": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": false,
-        ".indexOn": ["completedAt"]
+        ".indexOn": [
+          "completedAt"
+        ]
       }
     },
-
     "receipts": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": false
       }
     },
-
     "notifications": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".indexOn": ["at"],
+        ".indexOn": [
+          "at"
+        ],
         "$notificationId": {
           "read": {
             ".write": "auth != null && auth.uid === $uid",
@@ -103,15 +129,19 @@
         }
       }
     },
-
     "analytics": {
       ".read": false,
       ".write": false
     },
-
     "bannedUsers": {
       ".read": false,
       ".write": false
+    },
+    "ratings": {
+      "$tripId": {
+        ".read": "auth != null",
+        ".write": false
+      }
     }
   }
 }

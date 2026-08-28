@@ -1,8 +1,12 @@
 import { db } from "./lib/db";
+import { ServerValue } from "firebase-admin/database";
+
+const increment = (by: number) => ServerValue.increment(by);
 import { distanceKm, radiusBounds, round1 } from "./lib/geo";
 import type { LatLng } from "./lib/validate";
 import { VEHICLES, type VehicleType } from "./lib/catalog";
 import { tripEventUpdate } from "./lib/events";
+import { readAllDriverStats, ratingOf, acceptRateOf, type DriverStats } from "./lib/stats";
 import {
   DRIVER_STALE_AFTER_MS, OFFER_TTL_MS, MAX_OFFER_ROUNDS,
   DISPATCH_RADIUS_KM, FALLBACK_SPEED_KMH,
@@ -15,10 +19,7 @@ interface DriverRecord {
   vehicleType: VehicleType;
   status?: string;
   lastUpdated?: number;
-  activeTripId?: string | null;
   coldChain?: boolean;
-  rating?: number;
-  acceptRate?: number;
 }
 
 export interface Candidate {
@@ -34,12 +35,9 @@ export interface Candidate {
  * waits on; rating and accept-rate only break ties between drivers who are
  * roughly equally close.
  */
-export function scoreCandidate(driver: DriverRecord, pickupDistance: number): number {
+export function scoreCandidate(stats: DriverStats | undefined, pickupDistance: number): number {
   const etaMin = (pickupDistance / FALLBACK_SPEED_KMH) * 60;
-  const rating = typeof driver.rating === "number" ? driver.rating : 4.5;
-  const acceptRate = typeof driver.acceptRate === "number" ? driver.acceptRate : 0.8;
-
-  return etaMin + (5 - rating) * 2 + (1 - acceptRate) * 3;
+  return etaMin + (5 - ratingOf(stats)) * 2 + (1 - acceptRateOf(stats)) * 3;
 }
 
 export async function rankCandidates(options: {
@@ -64,11 +62,13 @@ export async function rankCandidates(options: {
     Object.entries(val).forEach(([id, d]) => seen.set(id, d));
   });
 
+  const stats = await readAllDriverStats();
+
   const candidates: Candidate[] = [];
   seen.forEach((driver, driverId) => {
     if (exclude.has(driverId)) return;
     if (driver.status !== "online") return;
-    if (driver.activeTripId) return;
+    if (stats[driverId]?.activeTripId) return;
     if (driver.vehicleType !== vehicleType) return;
     if (requiresColdChain && !driver.coldChain) return;
     if (typeof driver.lastUpdated !== "number" || now - driver.lastUpdated > DRIVER_STALE_AFTER_MS) return;
@@ -80,7 +80,7 @@ export async function rankCandidates(options: {
       driverId,
       pickupDistanceKm: round1(pickupDistanceKm),
       etaMin: Math.max(1, Math.round((pickupDistanceKm / FALLBACK_SPEED_KMH) * 60)),
-      score: scoreCandidate(driver, pickupDistanceKm),
+      score: scoreCandidate(stats[driverId], pickupDistanceKm),
     });
   });
 
@@ -136,6 +136,8 @@ export async function buildOfferUpdates(
     [`trips/${tripId}/offerRound`]: round,
     [`trips/${tripId}/etaToPickupMin`]: next.etaMin,
     // The offer is private to this one driver. No other driver can see the job.
+    // Counting every offer is what makes acceptRate meaningful later.
+    [`driverStats/${next.driverId}/offersReceived`]: increment(1),
     [`driverOffers/${next.driverId}/${tripId}`]: {
       tripId,
       tripType: trip.tripType,

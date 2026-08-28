@@ -5,7 +5,7 @@ import { ref, get } from "firebase/database";
 import { auth, db } from "../firebase";
 import {
   listenToMyOffers, listenToActiveTrip, acceptTrip, declineOffer,
-  arriveAtPickup, startTrip, cancelTrip, markCashPayment, completeTrip,
+  arriveAtPickup, startTrip, cancelTrip, markCashPayment, completeTrip, confirmDelivery,
   type DriverOffer, type TripRequest,
 } from "../lib/trips";
 import { VEHICLE_LABELS, formatRwf, type VehicleType } from "../lib/catalog";
@@ -73,7 +73,9 @@ export default function DriverPage() {
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
   const [trip, setTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<null | "accept" | "decline" | "arrive" | "start" | "cash" | "complete" | "cancel">(null);
+  const [busy, setBusy] = useState<null | "accept" | "decline" | "arrive" | "start" | "cash" | "complete" | "cancel" | "proof">(null);
+  const [deliveryCode, setDeliveryCode] = useState("");
+  const [recipientName, setRecipientName] = useState("");
   const seenOfferIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -230,6 +232,25 @@ export default function DriverPage() {
   }
 
   const paid = activeTrip?.paymentStatus === "successful" || activeTrip?.paymentStatus === "cash";
+  const needsProof = !!activeTrip?.deliveryCode && !activeTrip?.deliveryConfirmedAt;
+
+  async function submitProof() {
+    if (!activeTrip) return;
+    setError(null);
+    setBusy("proof");
+    try {
+      await confirmDelivery(activeTrip.id, deliveryCode.trim(), recipientName.trim() || undefined);
+      showToast("Delivery confirmed.", "success");
+      setDeliveryCode("");
+      setRecipientName("");
+    } catch (err) {
+      const message = errorMessage(err, "That code did not match.");
+      setError(message);
+      showToast(message, "error");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
     <div className="relative w-full h-[calc(100vh-96px)] md:h-[calc(100vh-108px)]">
@@ -405,9 +426,48 @@ export default function DriverPage() {
                     {busy === "cash" ? "Marking..." : "Take cash payment"}
                   </button>
                 )}
+                {needsProof && (
+                  <div className="space-y-2 border border-gray-200 rounded-lg p-3">
+                    <p className="text-sm font-semibold">Proof of delivery</p>
+                    <p className="text-xs text-gray-500">
+                      Ask the recipient for the 4-digit code shown in the sender&apos;s app.
+                    </p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={4}
+                      placeholder="4-digit code"
+                      aria-label="Delivery code"
+                      value={deliveryCode}
+                      onChange={(e) => setDeliveryCode(e.target.value.replace(/[^0-9]/g, ""))}
+                      className="w-full border rounded-lg px-3 py-3 text-base tracking-[0.3em] text-center"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Received by (optional)"
+                      aria-label="Recipient name"
+                      value={recipientName}
+                      onChange={(e) => setRecipientName(e.target.value)}
+                      className="w-full border rounded-lg px-3 py-3 text-base"
+                    />
+                    <button
+                      onClick={submitProof}
+                      disabled={busy !== null || deliveryCode.length !== 4}
+                      className="w-full bg-slate-800 text-white rounded-lg py-3 text-base font-semibold disabled:opacity-50"
+                    >
+                      {busy === "proof" ? "Checking..." : "Confirm delivery"}
+                    </button>
+                  </div>
+                )}
+                {activeTrip.deliveryConfirmedAt && (
+                  <p className="text-sm text-green-700 font-medium">
+                    Delivery confirmed
+                    {activeTrip.recipientName ? ` by ${activeTrip.recipientName}` : ""}.
+                  </p>
+                )}
                 <button
                   onClick={() => runTripAction("complete", completeTrip, "Job completed.", "Could not complete the job.")}
-                  disabled={busy !== null}
+                  disabled={busy !== null || needsProof}
                   className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50"
                 >
                   {busy === "complete" ? "Completing..." : paid ? "Complete job" : "Complete job (payment outstanding)"}
