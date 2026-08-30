@@ -13,10 +13,51 @@ a, button {
 }
 
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 2px solid #fea142;
+  outline: 2px solid #000000;
   outline-offset: 2px;
 }
 
 .animate-pulse-once {
   animation: pulseOnce 0.6s ease-in-out;
+}
+
+@layer components {
+  /* The one primary action on a screen. Uber uses a single full-width black bar. */
+  .btn-primary {
+    @apply w-full bg-ink text-white rounded-lg py-4 text-base font-semibold
+           active:bg-ink2 disabled:opacity-40 disabled:cursor-not-allowed
+           flex items-center justify-center gap-2;
+  }
+
+  .btn-secondary {
+    @apply w-full bg-surface text-ink rounded-lg py-4 text-base font-semibold
+           active:bg-line disabled:opacity-40 flex items-center justify-center gap-2;
+  }
+
+  .btn-danger {
+    @apply w-full bg-white text-red-600 border border-line rounded-lg py-3.5
+           text-sm font-semibold active:bg-surface disabled:opacity-40;
+  }
+
+  /* Bottom sheet: square-ish corners, hard shadow, no gradient. */
+  .sheet {
+    @apply bg-white rounded-t-2xl shadow-[0_-2px_16px_rgba(0,0,0,0.14)];
+  }
+
+  .field {
+    @apply w-full bg-surface border-0 rounded-lg px-4 py-3.5 text-base
+           text-ink placeholder:text-muted focus:ring-2 focus:ring-ink;
+  }
+
+  /* Selectable row: a left rule marks the choice rather than a coloured fill. */
+  .choice-row {
+    @apply w-full flex items-center justify-between rounded-lg px-4 py-3.5 text-left
+           border-2 transition-colors;
+  }
+  .choice-row-on { @apply border-ink bg-white; }
+  .choice-row-off { @apply border-transparent bg-surface; }
+
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-wider text-muted;
+  }
 }

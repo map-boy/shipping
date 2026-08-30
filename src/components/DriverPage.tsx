@@ -274,14 +274,14 @@ export default function DriverPage() {
           onChange={(e) => setVehicleType(e.target.value as VehicleType)}
           disabled={!!activeTrip}
           aria-label="Vehicle type"
-          className="border rounded-lg px-3 py-3 text-base bg-white shadow"
+          className="rounded-lg px-3 py-3 text-base bg-white shadow-[0_2px_10px_rgba(0,0,0,0.14)] font-medium"
         >
           {VEHICLE_OPTIONS.map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
 
-        <label className="flex items-center gap-2 bg-white shadow rounded-lg px-3 py-3 text-sm font-medium">
+        <label className="flex items-center gap-2 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.14)] rounded-lg px-3 py-3 text-sm font-medium">
           <input
             type="checkbox"
             checked={coldChain}
@@ -295,8 +295,8 @@ export default function DriverPage() {
         <button
           onClick={() => setOnline((v) => !v)}
           disabled={!!activeTrip || resuming}
-          className={`px-4 py-3 rounded-lg font-semibold text-base shadow disabled:opacity-50 ${
-            online ? "bg-green-600 text-white" : "bg-white text-gray-800"
+          className={`px-5 py-3 rounded-lg font-semibold text-base shadow-[0_2px_10px_rgba(0,0,0,0.14)] disabled:opacity-40 ${
+            online ? "bg-ink text-white" : "bg-white text-ink"
           }`}
         >
           {resuming ? "Loading..." : online ? "Online" : "Go online"}
@@ -309,47 +309,63 @@ export default function DriverPage() {
 
       {offer && !activeTrip && online && (
         <div className="absolute inset-0 z-30 bg-black/40 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Offered to you</p>
-              <span className="text-sm font-bold text-gray-700 tabular-nums">{secondsLeft}s</span>
-            </div>
-            <div className="h-1 rounded-full bg-gray-200 overflow-hidden">
-              <div
-                className="h-full bg-blue-600 transition-[width] duration-200"
-                style={{ width: `${Math.min(100, (secondsLeft / 20) * 100)}%` }}
-              />
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="eyebrow">
+                  {offer.serviceClass}
+                  {offer.handling !== "ambient" ? ` · ${offer.handling}` : ""}
+                </p>
+                <p className="text-3xl font-bold mt-1">{formatRwf(offer.price)}</p>
+              </div>
+              {/* The ring drains as the exclusive hold runs out. */}
+              <div className="relative w-12 h-12 shrink-0">
+                <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
+                  <circle cx="18" cy="18" r="16" fill="none" stroke="#E2E2E2" strokeWidth="3" />
+                  <circle
+                    cx="18" cy="18" r="16" fill="none" stroke="#000000" strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 16}
+                    strokeDashoffset={2 * Math.PI * 16 * (1 - Math.min(1, secondsLeft / 20))}
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums">
+                  {secondsLeft}
+                </span>
+              </div>
             </div>
 
-            <p className="text-lg font-bold">
-              {offer.tripType === "person" ? "Passenger ride" : "Goods delivery"}
-            </p>
-            <p className="text-sm text-gray-600">
-              {offer.pickupDistanceKm} km away &middot; about {offer.etaMin} min to pickup
-            </p>
-            <p className="text-sm text-gray-600">
-              Trip {offer.distanceKm} km &middot; {formatRwf(offer.price)}
-            </p>
-            <p className="text-xs uppercase tracking-wide text-gray-500">
-              {offer.serviceClass}
-              {offer.handling !== "ambient" ? ` · ${offer.handling}` : ""}
-            </p>
+            <div className="space-y-2 border-y border-line py-3">
+              <div className="flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-ink shrink-0" />
+                <span className="text-base">
+                  {offer.pickupDistanceKm} km away &middot; {offer.etaMin} min to pickup
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-[2px] bg-muted shrink-0" />
+                <span className="text-base text-muted">
+                  {offer.tripType === "person" ? "Passenger" : "Goods"} &middot; {offer.distanceKm} km trip
+                </span>
+              </div>
+            </div>
+
             {offer.goodsDescription && (
-              <p className="text-sm text-gray-500">{offer.goodsDescription}</p>
+              <p className="text-sm text-muted">{offer.goodsDescription}</p>
             )}
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3">
               <button
                 onClick={() => handleDecline(offer.tripId)}
                 disabled={busy !== null}
-                className="flex-1 bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300 disabled:opacity-50"
+                className="btn-secondary flex-1"
               >
                 {busy === "decline" ? "Passing..." : "Pass"}
               </button>
               <button
                 onClick={() => handleAccept(offer.tripId)}
                 disabled={busy !== null}
-                className="flex-1 bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700 disabled:opacity-50"
+                className="btn-primary flex-1"
               >
                 {busy === "accept" ? "Accepting..." : "Accept"}
               </button>
@@ -360,22 +376,25 @@ export default function DriverPage() {
 
       {activeTrip && (
         <div className="absolute left-0 right-0 bottom-0 z-20">
-          <div className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] px-4 pt-4 pb-6 space-y-3 max-h-[70vh] overflow-y-auto">
-            <h2 className="font-semibold">Active job</h2>
-            <p className="text-sm font-medium">
-              {activeTrip.tripType === "person" ? "Passenger" : "Goods delivery"}
-            </p>
-            <p className="text-sm text-gray-600">
-              {activeTrip.distanceKm} km &middot; {formatRwf(activeTrip.price)}
-            </p>
-            <p className="text-xs uppercase tracking-wide text-gray-500">
-              {activeTrip.serviceClass}
-              {activeTrip.handling !== "ambient" ? ` · ${activeTrip.handling}` : ""}
+          <div className="sheet px-5 pt-4 pb-7 space-y-3 max-h-[70vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="eyebrow">
+                  {activeTrip.serviceClass}
+                  {activeTrip.handling !== "ambient" ? ` · ${activeTrip.handling}` : ""}
+                </p>
+                <p className="text-xl font-bold mt-0.5 capitalize">
+                  {activeTrip.status.replace("_", " ")}
+                </p>
+              </div>
+              <p className="text-2xl font-bold shrink-0">{formatRwf(activeTrip.price)}</p>
+            </div>
+            <p className="text-base text-muted">
+              {activeTrip.tripType === "person" ? "Passenger" : "Goods"} &middot; {activeTrip.distanceKm} km
             </p>
             {activeTrip.goodsDescription && (
-              <p className="text-sm text-gray-500">{activeTrip.goodsDescription}</p>
+              <p className="text-sm text-muted">{activeTrip.goodsDescription}</p>
             )}
-            <p className="text-sm font-medium">Status: {activeTrip.status.replace("_", " ")}</p>
 
             {activeTrip.status === "accepted" && (
               <div className="space-y-2">
@@ -383,7 +402,7 @@ export default function DriverPage() {
                   <button
                     onClick={() => runTripAction("arrive", arriveAtPickup, "Pickup arrival recorded.", "Could not record arrival.")}
                     disabled={busy !== null}
-                    className="w-full bg-slate-800 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50"
+                    className="btn-secondary"
                   >
                     {busy === "arrive" ? "Saving..." : "I have arrived at pickup"}
                   </button>
@@ -391,14 +410,14 @@ export default function DriverPage() {
                 <button
                   onClick={() => runTripAction("start", startTrip, "Trip started.", "Could not start the trip.")}
                   disabled={busy !== null}
-                  className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50"
+                  className="btn-primary"
                 >
                   {busy === "start" ? "Starting..." : "Start trip"}
                 </button>
                 <button
                   onClick={() => runTripAction("cancel", cancelTrip, "Released back to other drivers.", "Could not release the job.")}
                   disabled={busy !== null}
-                  className="w-full border border-red-300 text-red-600 rounded-lg py-3 text-sm font-semibold disabled:opacity-50"
+                  className="btn-danger"
                 >
                   {busy === "cancel" ? "Releasing..." : "Can't make it - release job"}
                 </button>
@@ -421,15 +440,15 @@ export default function DriverPage() {
                   <button
                     onClick={() => runTripAction("cash", markCashPayment, "Marked as paid in cash.", "Could not mark as paid in cash.")}
                     disabled={busy !== null || activeTrip.paymentStatus === "pending"}
-                    className="w-full bg-amber-500 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50"
+                    className="btn-secondary"
                   >
                     {busy === "cash" ? "Marking..." : "Take cash payment"}
                   </button>
                 )}
                 {needsProof && (
-                  <div className="space-y-2 border border-gray-200 rounded-lg p-3">
-                    <p className="text-sm font-semibold">Proof of delivery</p>
-                    <p className="text-xs text-gray-500">
+                  <div className="space-y-2 bg-surface rounded-lg p-4">
+                    <p className="eyebrow">Proof of delivery</p>
+                    <p className="text-sm text-muted">
                       Ask the recipient for the 4-digit code shown in the sender&apos;s app.
                     </p>
                     <input
@@ -440,7 +459,7 @@ export default function DriverPage() {
                       aria-label="Delivery code"
                       value={deliveryCode}
                       onChange={(e) => setDeliveryCode(e.target.value.replace(/[^0-9]/g, ""))}
-                      className="w-full border rounded-lg px-3 py-3 text-base tracking-[0.3em] text-center"
+                      className="field bg-white text-2xl font-bold tracking-[0.4em] text-center"
                     />
                     <input
                       type="text"
@@ -448,19 +467,19 @@ export default function DriverPage() {
                       aria-label="Recipient name"
                       value={recipientName}
                       onChange={(e) => setRecipientName(e.target.value)}
-                      className="w-full border rounded-lg px-3 py-3 text-base"
+                      className="field bg-white"
                     />
                     <button
                       onClick={submitProof}
                       disabled={busy !== null || deliveryCode.length !== 4}
-                      className="w-full bg-slate-800 text-white rounded-lg py-3 text-base font-semibold disabled:opacity-50"
+                      className="btn-primary"
                     >
                       {busy === "proof" ? "Checking..." : "Confirm delivery"}
                     </button>
                   </div>
                 )}
                 {activeTrip.deliveryConfirmedAt && (
-                  <p className="text-sm text-green-700 font-medium">
+                  <p className="text-base font-semibold">
                     Delivery confirmed
                     {activeTrip.recipientName ? ` by ${activeTrip.recipientName}` : ""}.
                   </p>
@@ -468,13 +487,13 @@ export default function DriverPage() {
                 <button
                   onClick={() => runTripAction("complete", completeTrip, "Job completed.", "Could not complete the job.")}
                   disabled={busy !== null || needsProof}
-                  className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50"
+                  className="btn-primary"
                 >
                   {busy === "complete" ? "Completing..." : paid ? "Complete job" : "Complete job (payment outstanding)"}
                 </button>
                 {!paid && (
-                  <p className="text-xs text-gray-500 text-center">
-                    You can finish the delivery now; the unpaid amount stays on the record.
+                  <p className="text-sm text-muted text-center">
+                    You can finish now; the unpaid amount stays on the record.
                   </p>
                 )}
               </div>

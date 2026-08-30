@@ -116,11 +116,11 @@ export default function RidePage() {
         <div className="absolute top-16 left-3 right-3 z-20">
           <button
             onClick={() => setPickingDestination(true)}
-            className="w-full flex items-center gap-3 bg-white rounded-xl shadow-lg px-4 py-4 text-left active:bg-gray-50"
+            className="w-full flex items-center gap-3 bg-white rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.16)] px-4 py-4 text-left active:bg-surface"
           >
-            <span className="w-3 h-3 bg-black rounded-[2px] shrink-0" />
-            <span className={`flex-1 truncate font-medium ${destination ? "text-gray-900" : "text-gray-500"}`}>
-              {destination ? destination.name : "Where are you going?"}
+            <span className="w-2.5 h-2.5 bg-ink rounded-[2px] shrink-0" />
+            <span className={`flex-1 truncate text-lg font-semibold ${destination ? "text-ink" : "text-muted"}`}>
+              {destination ? destination.name : "Where to?"}
             </span>
           </button>
         </div>
@@ -129,7 +129,7 @@ export default function RidePage() {
       {!sheetOpen && (destination || activeTrip) && (
         <button
           onClick={() => setSheetOpen(true)}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-blue-600 text-white font-semibold px-6 py-3 rounded-full shadow-lg"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-ink text-white font-semibold px-6 py-3.5 rounded-full shadow-[0_2px_12px_rgba(0,0,0,0.28)] active:bg-ink2"
         >
           {activeTrip ? "Trip details" : "Choose a ride"}
         </button>
@@ -140,53 +140,53 @@ export default function RidePage() {
           sheetOpen ? "translate-y-0" : "translate-y-full"
         }`}
       >
-        <div className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] max-h-[78vh] overflow-y-auto">
-          <div className="flex justify-center pt-2 pb-1">
+        <div className="sheet max-h-[78vh] overflow-y-auto">
+          <div className="flex justify-center pt-2.5 pb-1.5">
             <button
               onClick={() => setSheetOpen(false)}
-              className="w-10 h-1.5 rounded-full bg-gray-300"
+              className="w-9 h-1 rounded-full bg-line"
               aria-label="Collapse"
             />
           </div>
-          <div className="px-4 pb-6">
+          <div className="px-5 pb-7">
             {activeTrip ? (
               <div className="space-y-3">
-                <div className="rounded-lg px-4 py-3 text-center font-bold text-base bg-amber-50 text-amber-700">
+                <p className="text-2xl font-bold text-center pt-1">
                   {STATUS_COPY[activeTrip.status] ?? activeTrip.status}
-                </div>
+                </p>
 
                 {activeTrip.status === "requested" && (
-                  <p className="text-xs text-center text-gray-500">
-                    Offering to nearby drivers
-                    {activeTrip.offerRound ? ` (driver ${activeTrip.offerRound})` : ""}
+                  <p className="text-sm text-center text-muted">
+                    Contacting nearby drivers
+                    {activeTrip.offerRound ? ` (${activeTrip.offerRound})` : ""}
                   </p>
                 )}
                 {activeTrip.status === "accepted" && activeTrip.etaToPickupMin != null && (
-                  <p className="text-sm text-center text-gray-600">
-                    About {activeTrip.etaToPickupMin} min away
-                    {activeTrip.arrivedAt ? " · driver has arrived" : ""}
+                  <p className="text-base text-center text-muted">
+                    {activeTrip.arrivedAt ? "Your driver has arrived" : `About ${activeTrip.etaToPickupMin} min away`}
                   </p>
                 )}
 
-                <p className="text-sm text-gray-600 text-center">
-                  {activeTrip.distanceKm} km &middot; {formatRwf(activeTrip.price)}
-                </p>
+                <div className="flex items-center justify-between border-y border-line py-3">
+                  <span className="text-muted">{activeTrip.distanceKm} km</span>
+                  <span className="text-lg font-semibold">{formatRwf(activeTrip.price)}</span>
+                </div>
                 {activeTrip.fare && activeTrip.fare.surgeMultiplier > 1 && (
-                  <p className="text-xs text-center text-amber-700">
-                    Includes {activeTrip.fare.surgeMultiplier}x busy-period pricing
+                  <p className="text-sm text-center text-muted">
+                    Includes {activeTrip.fare.surgeMultiplier}&times; busy-period pricing
                   </p>
                 )}
                 {activeTrip.promisedBy && activeTrip.serviceClass !== "express" && (
-                  <p className="text-xs text-center text-gray-500">
+                  <p className="text-sm text-center text-muted">
                     Promised by {new Date(activeTrip.promisedBy).toLocaleDateString()}
                   </p>
                 )}
 
                 {activeTrip.deliveryCode && activeTrip.status !== "requested" && (
-                  <div className="rounded-lg border border-gray-200 p-3 text-center">
-                    <p className="text-xs uppercase tracking-wide text-gray-500">Delivery code</p>
-                    <p className="text-3xl font-bold tracking-[0.3em] mt-1">{activeTrip.deliveryCode}</p>
-                    <p className="text-xs text-gray-500 mt-1">
+                  <div className="rounded-lg bg-surface p-4 text-center">
+                    <p className="eyebrow">Delivery code</p>
+                    <p className="text-4xl font-bold tracking-[0.35em] mt-1.5 ml-[0.35em]">{activeTrip.deliveryCode}</p>
+                    <p className="text-sm text-muted mt-1.5">
                       {activeTrip.deliveryConfirmedAt
                         ? "Confirmed by the driver."
                         : "Give this to the driver only when the goods arrive."}
@@ -198,7 +198,7 @@ export default function RidePage() {
                   <button
                     onClick={handleCancel}
                     disabled={cancelling}
-                    className="w-full border border-red-300 text-red-600 rounded-lg py-3 text-sm font-semibold disabled:opacity-50"
+                    className="btn-danger"
                   >
                     {cancelling ? "Cancelling..." : "Cancel trip"}
                   </button>
@@ -214,8 +214,8 @@ export default function RidePage() {
                   )}
 
                 {activeTrip.paymentStatus === "cash" && (
-                  <p className="text-center text-sm text-green-700 font-medium">
-                    Your driver recorded this trip as paid in cash.
+                  <p className="text-center text-base font-medium">
+                    Paid in cash.
                   </p>
                 )}
               </div>

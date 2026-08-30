@@ -7,6 +7,13 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Uber-style neutral ramp: the UI is black, white and grey, and colour
+        // is reserved for state (success, error, surge).
+        ink: "#000000",
+        ink2: "#1F1F1F",
+        muted: "#6B6B6B",
+        line: "#E2E2E2",
+        surface: "#F6F6F6",
         heroFrom: "#0f4c8b",
         heroTo: "#3b82f6",
         cta: "#fea142",

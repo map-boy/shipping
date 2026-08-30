@@ -17,6 +17,14 @@ interface Props {
   routeDurationMin?: number;
 }
 
+const VEHICLE_GLYPH: Record<VehicleType, string> = {
+  standard: "\u{1F697}",
+  car_hire: "\u{1F695}",
+  bus: "\u{1F68C}",
+  truck: "\u{1F69B}",
+  vip: "\u{1F699}",
+};
+
 function windowLabel(promisedBy: number, serviceClass: ServiceClass): string {
   if (serviceClass === "express") return "Today";
   const days = Math.round((promisedBy - Date.now()) / (24 * 60 * 60 * 1000));
@@ -130,16 +138,16 @@ export default function BookingForm({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex bg-surface rounded-lg p-1">
         {(["person", "goods"] as TripType[]).map((t) => (
           <button
             key={t}
             onClick={() => setTripType(t)}
-            className={`flex-1 px-4 py-3 rounded-lg text-base font-medium min-h-[44px] ${
-              tripType === t ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-800"
+            className={`flex-1 px-4 py-2.5 rounded-md text-base font-semibold transition-colors ${
+              tripType === t ? "bg-white text-ink shadow-sm" : "text-muted"
             }`}
           >
-            {t === "person" ? "People" : "Goods"}
+            {t === "person" ? "Ride" : "Send"}
           </button>
         ))}
       </div>
@@ -148,50 +156,48 @@ export default function BookingForm({
         <>
           <input
             type="text"
-            placeholder="What are you sending? (e.g. furniture, vaccines, produce)"
+            placeholder="What are you sending?"
             value={goodsDescription}
             onChange={(e) => setGoodsDescription(e.target.value)}
-            className="w-full border rounded-lg px-3 py-3 text-base"
+            className="field"
           />
 
           <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">Service class</p>
+            <p className="eyebrow mb-2">Speed</p>
             <div className="space-y-2">
               {SERVICE_CLASSES.map((sc) => (
                 <button
                   key={sc.value}
                   onClick={() => setGoodsServiceClass(sc.value)}
-                  className={`w-full flex items-center justify-between border rounded-lg px-3 py-3 text-left ${
-                    serviceClass === sc.value ? "border-blue-600 bg-blue-50" : "border-gray-200"
-                  }`}
+                  className={`choice-row ${serviceClass === sc.value ? "choice-row-on" : "choice-row-off"}`}
                 >
                   <span>
-                    <span className="block font-medium">{sc.label}</span>
-                    <span className="block text-xs text-gray-500">{sc.description}</span>
+                    <span className="block font-semibold">{sc.label}</span>
+                    <span className="block text-sm text-muted">{sc.description}</span>
                   </span>
-                  <span className="text-sm font-semibold text-gray-700 shrink-0 ml-3">{sc.window}</span>
+                  <span className="text-sm font-semibold shrink-0 ml-3">{sc.window}</span>
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">Temperature</p>
+            <p className="eyebrow mb-2">Temperature</p>
             <div className="flex gap-2">
               {HANDLING_OPTIONS.map((h) => (
                 <button
                   key={h.value}
                   onClick={() => setGoodsHandling(h.value)}
                   title={h.detail}
-                  className={`flex-1 px-2 py-2.5 rounded-lg text-sm font-medium border ${
-                    handling === h.value ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-700"
+                  className={`flex-1 px-2 py-3 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                    handling === h.value ? "border-ink bg-white text-ink" : "border-transparent bg-surface text-muted"
                   }`}
                 >
                   {h.value === "ambient" ? "RT" : h.label}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-sm text-muted mt-1.5">
               {HANDLING_OPTIONS.find((h) => h.value === handling)?.detail}
             </p>
           </div>
@@ -199,17 +205,22 @@ export default function BookingForm({
       )}
 
       {!destination && (
-        <p className="text-sm text-gray-500">Choose a destination on the map to see prices.</p>
+        <p className="text-sm text-muted">Choose a destination to see prices.</p>
       )}
-      {destination && <p className="text-sm text-gray-500 truncate">To: {destination.name}</p>}
+      {destination && (
+        <div className="flex items-center gap-3 py-1">
+          <span className="w-2.5 h-2.5 bg-ink rounded-[2px] shrink-0" />
+          <span className="text-base truncate">{destination.name}</span>
+        </div>
+      )}
 
       {surging && (
-        <p className="text-sm bg-amber-50 text-amber-800 rounded-lg px-3 py-2">
-          Busy right now &mdash; fares are {market!.surgeMultiplier}x while demand is high.
+        <p className="text-sm bg-surface text-ink rounded-lg px-4 py-3 font-medium">
+          Busy right now &mdash; fares are {market!.surgeMultiplier}&times; until demand settles.
         </p>
       )}
 
-      {loadingQuotes && <p className="text-sm text-gray-500">Getting prices...</p>}
+      {loadingQuotes && <p className="text-sm text-muted">Getting prices...</p>}
       {(error || quoteError) && <p className="text-red-600 text-sm">{error ?? quoteError}</p>}
 
       {quotes.length > 0 && (
@@ -218,15 +229,16 @@ export default function BookingForm({
             <button
               key={q.vehicleType}
               onClick={() => setChosenVehicle(q.vehicleType)}
-              className={`w-full flex items-center justify-between border rounded-lg px-3 py-3 text-left min-h-[44px] ${
-                vehicleType === q.vehicleType ? "border-blue-600 bg-blue-50" : "border-gray-200"
-              }`}
+              className={`choice-row ${vehicleType === q.vehicleType ? "choice-row-on" : "choice-row-off"}`}
             >
-              <span>
-                <span className="block font-medium">{q.label}</span>
-                <span className="block text-xs text-gray-500">
-                  {q.distanceKm} km &middot; {windowLabel(q.promisedBy, q.serviceClass)}
-                  {q.maxLoadKg ? ` · up to ${q.maxLoadKg} kg` : ""}
+              <span className="flex items-center gap-3 min-w-0">
+                <span className="text-2xl shrink-0" aria-hidden="true">{VEHICLE_GLYPH[q.vehicleType]}</span>
+                <span className="min-w-0">
+                  <span className="block font-semibold truncate">{q.label}</span>
+                  <span className="block text-sm text-muted truncate">
+                    {windowLabel(q.promisedBy, q.serviceClass)} &middot; {q.distanceKm} km
+                    {q.maxLoadKg ? ` · ${q.maxLoadKg} kg` : ""}
+                  </span>
                 </span>
               </span>
               <span className="font-semibold shrink-0 ml-3">{formatRwf(q.price)}</span>
@@ -238,9 +250,9 @@ export default function BookingForm({
       <button
         onClick={handleAddToCart}
         disabled={!selected || loadingQuotes}
-        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700"
+        className="btn-primary"
       >
-        {selected ? `Add to cart · ${formatRwf(selected.price)}` : "Choose a destination to see prices"}
+        {selected ? `Add ${VEHICLE_GLYPH[selected.vehicleType]} · ${formatRwf(selected.price)}` : "Choose a destination"}
       </button>
     </div>
   );

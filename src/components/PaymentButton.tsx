@@ -94,14 +94,14 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
   }
 
   if (paymentStatus === "successful") {
-    return <p className="text-green-600 font-medium text-center">Payment received. Thank you!</p>;
+    return <p className="text-center text-base font-semibold">Payment received. Thank you.</p>;
   }
 
   const isPending = paymentStatus === "pending" || (requested && paymentStatus !== "failed");
 
   return (
-    <div className="p-4 border rounded-lg space-y-3">
-      <p className="font-medium">Pay {amount.toLocaleString()} RWF via Mobile Money</p>
+    <div className="space-y-3">
+      <p className="eyebrow">Pay by Mobile Money</p>
       <input
         type="tel"
         inputMode="tel"
@@ -109,23 +109,23 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
         aria-label="Mobile Money phone number"
         value={phoneNumber}
         onChange={(e) => setPhoneNumber(e.target.value)}
-        className="w-full border rounded-lg px-3 py-3 text-base"
+        className="field"
         disabled={isPending}
       />
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {paymentStatus === "failed" && (
         <p className="text-red-600 text-sm">Payment failed. Please try again.</p>
       )}
-      {isPending && <p className="text-sm text-gray-500">Waiting for confirmation on your phone...</p>}
+      {isPending && <p className="text-sm text-muted">Check your phone to approve.</p>}
       <button
         onClick={handlePay}
         disabled={isPending}
-        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700 flex items-center justify-center gap-2"
+        className="btn-primary"
       >
         {isPending && (
           <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
         )}
-        {isPending ? "Waiting..." : "Pay now"}
+        {isPending ? "Waiting..." : `Pay ${amount.toLocaleString()} RWF`}
       </button>
     </div>
   );
