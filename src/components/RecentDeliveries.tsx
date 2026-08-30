@@ -1,4 +1,4 @@
-﻿import Reveal from "./Reveal";
+import Reveal from "./Reveal";
 
 const deliveries = [
   { item: "Passenger Ride", from: "Kimironko, Kigali", to: "Nyabugogo, Kigali", price: "2,400 RWF" },

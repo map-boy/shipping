@@ -1,4 +1,4 @@
-﻿import Reveal from "./Reveal";
+import Reveal from "./Reveal";
 
 const testimonials = [
   { name: "Eric N.", text: "I book a taxi almost every day for work. Drivers show up fast and I can see them coming on the map." },

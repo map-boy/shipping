@@ -1,0 +1,80 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  functions:
+    name: Cloud Functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+
+      - run: npm ci
+        working-directory: functions
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: functions
+
+      - name: Build
+        run: npm run build
+        working-directory: functions
+
+  rules:
+    name: Database rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # A malformed rules file fails the deploy rather than the build, so it is
+      # worth catching here.
+      - name: Validate database.rules.json
+        run: python3 -m json.tool database.rules.json > /dev/null
+
+      - name: Check for BOM or UTF-16 in tracked text files
+        run: |
+          bad=0
+          for f in $(git ls-files '*.ts' '*.tsx' '*.js' '*.json' '*.html' '*.css' '*.md'); do
+            if head -c3 "$f" | od -An -tx1 | tr -d ' \n' | grep -q '^efbbbf'; then
+              echo "UTF-8 BOM: $f"; bad=1
+            fi
+            if grep -qP '\x00' "$f" 2>/dev/null; then
+              echo "Null bytes (UTF-16?): $f"; bad=1
+            fi
+          done
+          exit $bad

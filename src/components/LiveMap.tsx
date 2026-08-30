@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { listenNearbyDrivers, type DriverLocation, type VehicleType } from "../lib/drivers";
 import { listenToDriverLocation } from "../lib/trackDriver";
@@ -7,12 +7,18 @@ import { fetchRoute } from "../lib/directions";
 const VEHICLE_OPTIONS: { value: VehicleType | "all"; label: string; color: string }[] = [
   { value: "all", label: "All", color: "#2563eb" },
   { value: "standard", label: "Standard", color: "#16a34a" },
+  { value: "car_hire", label: "Car hire", color: "#0891b2" },
+  { value: "bus", label: "Bus", color: "#db2777" },
   { value: "truck", label: "Truck", color: "#ca8a04" },
   { value: "vip", label: "VIP", color: "#7c3aed" },
 ];
 
+const CAR_ICON = `<path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11m-14 0h14m-14 0a2 2 0 0 0-2 2v3a1 1 0 0 0 1 1h1m14-6a2 2 0 0 1 2 2v3a1 1 0 0 1-1 1h-1M7 17v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1m13 0v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1M7 11h10" stroke="white" stroke-width="1.4" fill="none"/>`;
+
 const VEHICLE_ICON_SVG: Record<VehicleType, string> = {
-  standard: `<path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11m-14 0h14m-14 0a2 2 0 0 0-2 2v3a1 1 0 0 0 1 1h1m14-6a2 2 0 0 1 2 2v3a1 1 0 0 1-1 1h-1M7 17v1a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-1m13 0v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1M7 11h10" stroke="white" stroke-width="1.4" fill="none"/>`,
+  standard: CAR_ICON,
+  car_hire: CAR_ICON,
+  bus: `<path fill="white" d="M4 4h16v11H4zM6 17.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM18 17.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM6 6h5v4H6zM13 6h5v4h-5z"/>`,
   truck: `<path fill="white" d="M3 7h11v8H3zM14 10h4l3 3v2h-7zM6.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM17.5 19a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>`,
   vip: `<path fill="white" d="M12 2l2.5 6.5L21 9l-5 4.5L17.5 21 12 17l-5.5 4L8 13.5 3 9l6.5-.5z"/>`,
 };
@@ -133,6 +139,9 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
     return () => {
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     };
+    // Builds the map exactly once. fullScreen only picks the initial control layout and
+    // onLocationChange is a stable setter from the parent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

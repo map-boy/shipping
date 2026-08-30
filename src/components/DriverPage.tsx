@@ -1,71 +1,82 @@
-﻿import { useEffect, useRef, useState } from "react";
-import { publishDriverLocation, goOffline, type VehicleType } from "../lib/drivers";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { publishDriverLocation, goOffline } from "../lib/drivers";
 import DriverMap from "./DriverMap";
 import { ref, get } from "firebase/database";
-import { db } from "../firebase";
-import { listenToOpenTrips, listenToTrip, acceptTrip, updateTripStatus, markCashPayment, completeTrip, type TripRequest } from "../lib/trips";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
+import {
+  listenToMyOffers, listenToActiveTrip, acceptTrip, declineOffer,
+  arriveAtPickup, startTrip, cancelTrip, markCashPayment, completeTrip, confirmDelivery,
+  type DriverOffer, type TripRequest,
+} from "../lib/trips";
+import { VEHICLE_LABELS, formatRwf, type VehicleType } from "../lib/catalog";
 import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
-import { useToast } from "./Toast";
+import { useToast } from "../context/toast";
 
-const VEHICLES: { value: VehicleType; label: string }[] = [
-  { value: "standard", label: "Standard" },
-  { value: "truck", label: "Truck" },
-  { value: "vip", label: "VIP" },
-];
+const VEHICLE_OPTIONS = Object.entries(VEHICLE_LABELS) as [VehicleType, string][];
+
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
 
 function playBeep() {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.001, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
-    setTimeout(() => {
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.type = "sine";
-      osc2.frequency.value = 880;
-      gain2.gain.setValueAtTime(0.001, ctx.currentTime);
-      gain2.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + 0.01);
-      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-      osc2.start();
-      osc2.stop(ctx.currentTime + 0.4);
-    }, 450);
+    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctor) return;
+    const ctx = new Ctor();
+    const blip = (offsetSec: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      const at = ctx.currentTime + offsetSec;
+      gain.gain.setValueAtTime(0.001, at);
+      gain.gain.exponentialRampToValueAtTime(0.3, at + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, at + 0.35);
+      osc.start(at);
+      osc.stop(at + 0.4);
+    };
+    blip(0);
+    blip(0.45);
+    setTimeout(() => ctx.close().catch(() => {}), 1200);
   } catch {
-    // ignore if audio not supported
+    // audio unavailable - the on-screen alert still fires
   }
+}
+
+/** Counts down an exclusive offer so the driver can see it lapsing. */
+function useCountdown(expiresAt: number | undefined) {
+  const [remaining, setRemaining] = useState(0);
+  useEffect(() => {
+    if (!expiresAt) return;
+    const tick = () => setRemaining(Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [expiresAt]);
+  return remaining;
 }
 
 export default function DriverPage() {
   const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(auth.currentUser);
   const [authChecked, setAuthChecked] = useState(false);
-  const [online, setOnline] = useState(() => localStorage.getItem("driverOnline") === "true");
-  const [vehicleType, setVehicleType] = useState<VehicleType>(() => (localStorage.getItem("driverVehicleType") as VehicleType) || "standard");
-  const [resuming, setResuming] = useState(true);
-  const [openTrips, setOpenTrips] = useState<TripRequest[]>([]);
+  const [online, setOnline] = useState(false);
+  const [vehicleType, setVehicleType] = useState<VehicleType>(
+    () => (localStorage.getItem("driverVehicleType") as VehicleType) || "standard"
+  );
+  const [coldChain, setColdChain] = useState(() => localStorage.getItem("driverColdChain") === "true");
+  const [driverLoaded, setDriverLoaded] = useState(false);
+  const [offers, setOffers] = useState<DriverOffer[]>([]);
   const [driverPos, setDriverPos] = useState<{ lat: number; lng: number } | null>(null);
-  const [activeTrip, setActiveTrip] = useState<TripRequest | null>(null);
+  const [trip, setTrip] = useState<TripRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [alertTrip, setAlertTrip] = useState<TripRequest | null>(null);
-  const [accepting, setAccepting] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [markingCash, setMarkingCash] = useState(false);
-  const [completing, setCompleting] = useState(false);
-  const watchIdRef = useRef<number | null>(null);
-  const knownTripIdsRef = useRef<Set<string>>(new Set());
-  const ignoredTripIdsRef = useRef<Set<string>>(new Set());
+  const [busy, setBusy] = useState<null | "accept" | "decline" | "arrive" | "start" | "cash" | "complete" | "cancel" | "proof">(null);
+  const [deliveryCode, setDeliveryCode] = useState("");
+  const [recipientName, setRecipientName] = useState("");
+  const seenOfferIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -77,36 +88,52 @@ export default function DriverPage() {
 
   useEffect(() => {
     if (!user) return;
-    get(ref(db, `drivers/${user.uid}/status`)).then((snap) => {
-      const dbOnline = snap.exists() && snap.val() === "online";
-      setOnline(dbOnline);
-      localStorage.setItem("driverOnline", String(dbOnline));
-      setResuming(false);
-    }).catch(() => setResuming(false));
+    let cancelled = false;
+    get(ref(db, `drivers/${user.uid}`))
+      .then((snap) => {
+        if (cancelled) return;
+        const val = snap.val();
+        setOnline(val?.status === "online");
+        if (val?.vehicleType) setVehicleType(val.vehicleType as VehicleType);
+        if (typeof val?.coldChain === "boolean") setColdChain(val.coldChain);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setDriverLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   useEffect(() => {
-    localStorage.setItem("driverOnline", String(online));
-  }, [online]);
-
-  useEffect(() => {
     localStorage.setItem("driverVehicleType", vehicleType);
-  }, [vehicleType]);
+    localStorage.setItem("driverColdChain", String(coldChain));
+  }, [vehicleType, coldChain]);
 
   useEffect(() => {
     if (!user) return;
+    return listenToActiveTrip(user.uid, (t) => setTrip(t && t.driverId === user.uid ? t : null));
+  }, [user]);
+
+  const resuming = !!user && !driverLoaded;
+  const activeTrip = user ? trip : null;
+
+  useEffect(() => {
+    if (!user || resuming) return;
     const driverId = user.uid;
 
     if (!online) {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-      goOffline(driverId);
+      goOffline(driverId).catch(() => undefined);
       return;
     }
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
+    const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         setDriverPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        publishDriverLocation(driverId, pos.coords.latitude, pos.coords.longitude, vehicleType, "online");
+        publishDriverLocation(
+          driverId, pos.coords.latitude, pos.coords.longitude, vehicleType, "online", coldChain
+        ).catch(() => undefined);
       },
       (err) => {
         setError(err.message);
@@ -115,95 +142,79 @@ export default function DriverPage() {
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
     );
 
-    return () => {
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-    };
-  }, [online, vehicleType, user]);
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [online, vehicleType, coldChain, user, resuming, showToast]);
 
+  // Only this driver's own offers. There is no shared board to poll.
   useEffect(() => {
-    if (!online || !driverPos || activeTrip) {
-      setOpenTrips([]);
-      knownTripIdsRef.current = new Set();
+    if (!user || !online || activeTrip) {
+      seenOfferIds.current = new Set();
       return;
     }
-    const unsub = listenToOpenTrips(driverPos, 15, vehicleType, (rawTrips) => {
-      const trips = rawTrips.filter((t) => !ignoredTripIdsRef.current.has(t.id));
-      const newOnes = trips.filter((t) => !knownTripIdsRef.current.has(t.id));
-      if (newOnes.length > 0) {
+    return listenToMyOffers(user.uid, (list) => {
+      const fresh = list.filter((o) => !seenOfferIds.current.has(o.tripId));
+      seenOfferIds.current = new Set(list.map((o) => o.tripId));
+      setOffers(list);
+      if (fresh.length > 0) {
         playBeep();
-        setAlertTrip(newOnes[0]);
-        showToast("New ride request nearby!", "info");
+        showToast("You have a new job offer.", "info");
       }
-      knownTripIdsRef.current = new Set(trips.map((t) => t.id));
-      setOpenTrips(trips);
     });
-    return unsub;
-  }, [vehicleType, online, driverPos, activeTrip]);
+  }, [user, online, activeTrip, showToast]);
 
-  async function handleAccept(tripId: string) {
-    if (!user) return;
-    setError(null);
-    setAlertTrip(null);
-    setAccepting(true);
-    ignoredTripIdsRef.current.add(tripId);
-    try {
-      const won = await acceptTrip(tripId, user.uid);
-      if (!won) {
-        showToast("Too slow - another driver already accepted that trip.", "error");
-        return;
+  // Derived, so going offline or picking up a job hides offers without a state reset.
+  const offer = online && !activeTrip ? offers[0] ?? null : null;
+  const secondsLeft = useCountdown(offer?.expiresAt);
+
+  const handleAccept = useCallback(
+    async (tripId: string) => {
+      setError(null);
+      setBusy("accept");
+      try {
+        await acceptTrip(tripId);
+        showToast("Job accepted.", "success");
+      } catch (err) {
+        showToast(errorMessage(err, "That offer is no longer available."), "error");
+      } finally {
+        setBusy(null);
       }
-      showToast("Trip accepted!", "success");
-      listenToTrip(tripId, (trip) => {
-        setActiveTrip(trip);
-      });
-    } catch (err: any) {
-      showToast(err.message || "Could not accept the trip.", "error");
-    } finally {
-      setAccepting(false);
-    }
-  }
+    },
+    [showToast]
+  );
 
-  async function handleStartTrip() {
-    if (!activeTrip) return;
-    setStarting(true);
-    try {
-      await updateTripStatus(activeTrip.id, "in_progress");
-      showToast("Trip started.", "success");
-    } catch (err: any) {
-      showToast(err.message || "Could not start the trip.", "error");
-    } finally {
-      setStarting(false);
-    }
-  }
+  const handleDecline = useCallback(
+    async (tripId: string) => {
+      setBusy("decline");
+      try {
+        await declineOffer(tripId);
+        showToast("Passed. It has gone to the next driver.", "info");
+      } catch (err) {
+        showToast(errorMessage(err, "Could not pass on that offer."), "error");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [showToast]
+  );
 
-  async function handleMarkCash() {
-    if (!activeTrip) return;
-    setError(null);
-    setMarkingCash(true);
-    try {
-      await markCashPayment(activeTrip.id);
-      showToast("Marked as paid in cash.", "success");
-    } catch (err: any) {
-      setError(err.message || "Could not mark as paid in cash.");
-      showToast(err.message || "Could not mark as paid in cash.", "error");
-    } finally {
-      setMarkingCash(false);
-    }
-  }
-
-  async function handleCompleteTrip() {
+  async function runTripAction(
+    kind: "arrive" | "start" | "cash" | "complete" | "cancel",
+    action: (tripId: string) => Promise<void>,
+    success: string,
+    fallback: string
+  ) {
     if (!activeTrip) return;
     setError(null);
-    setCompleting(true);
+    setBusy(kind);
     try {
-      await completeTrip(activeTrip.id);
-      showToast("Trip completed! Payment confirmed.", "success");
-      setActiveTrip(null);
-    } catch (err: any) {
-      setError(err.message || "Could not complete trip. Make sure payment is done first.");
-      showToast(err.message || "Could not complete trip. Make sure payment is done first.", "error");
+      await action(activeTrip.id);
+      showToast(success, "success");
+    } catch (err) {
+      const message = errorMessage(err, fallback);
+      setError(message);
+      showToast(message, "error");
     } finally {
-      setCompleting(false);
+      setBusy(null);
     }
   }
 
@@ -215,9 +226,30 @@ export default function DriverPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-2">Driver dashboard</h1>
-        <p className="text-gray-600">Please log in first to go online and accept trips.</p>
+        <p className="text-gray-600">Please log in first to go online and receive job offers.</p>
       </div>
     );
+  }
+
+  const paid = activeTrip?.paymentStatus === "successful" || activeTrip?.paymentStatus === "cash";
+  const needsProof = !!activeTrip?.deliveryCode && !activeTrip?.deliveryConfirmedAt;
+
+  async function submitProof() {
+    if (!activeTrip) return;
+    setError(null);
+    setBusy("proof");
+    try {
+      await confirmDelivery(activeTrip.id, deliveryCode.trim(), recipientName.trim() || undefined);
+      showToast("Delivery confirmed.", "success");
+      setDeliveryCode("");
+      setRecipientName("");
+    } catch (err) {
+      const message = errorMessage(err, "That code did not match.");
+      setError(message);
+      showToast(message, "error");
+    } finally {
+      setBusy(null);
+    }
   }
 
   return (
@@ -225,35 +257,49 @@ export default function DriverPage() {
       {online ? (
         <DriverMap
           driverPos={driverPos}
-          openTrips={openTrips}
+          openTrips={offer ? [offer] : []}
           activeTrip={activeTrip}
           onAccept={handleAccept}
           fullScreen
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-500 text-sm px-6 text-center">
-          Go online to see the map and start receiving requests.
+          Go online to start receiving job offers.
         </div>
       )}
 
-      <div className="absolute top-3 left-3 right-3 z-20 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center gap-2">
         <select
           value={vehicleType}
           onChange={(e) => setVehicleType(e.target.value as VehicleType)}
           disabled={!!activeTrip}
-          className="border rounded-lg px-3 py-3 text-base bg-white shadow"
+          aria-label="Vehicle type"
+          className="rounded-lg px-3 py-3 text-base bg-white shadow-[0_2px_10px_rgba(0,0,0,0.14)] font-medium"
         >
-          {VEHICLES.map((v) => (
-            <option key={v.value} value={v.value}>{v.label}</option>
+          {VEHICLE_OPTIONS.map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
           ))}
         </select>
+
+        <label className="flex items-center gap-2 bg-white shadow-[0_2px_10px_rgba(0,0,0,0.14)] rounded-lg px-3 py-3 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={coldChain}
+            disabled={!!activeTrip}
+            onChange={(e) => setColdChain(e.target.checked)}
+            className="w-4 h-4"
+          />
+          Cold chain
+        </label>
 
         <button
           onClick={() => setOnline((v) => !v)}
           disabled={!!activeTrip || resuming}
-          className={`px-4 py-3 rounded-lg font-semibold text-base shadow ${online ? "bg-green-600 text-white" : "bg-white text-gray-800"}`}
+          className={`px-5 py-3 rounded-lg font-semibold text-base shadow-[0_2px_10px_rgba(0,0,0,0.14)] disabled:opacity-40 ${
+            online ? "bg-ink text-white" : "bg-white text-ink"
+          }`}
         >
-          {online ? "Online" : "Go online"}
+          {resuming ? "Loading..." : online ? "Online" : "Go online"}
         </button>
       </div>
 
@@ -261,34 +307,67 @@ export default function DriverPage() {
         <div className="absolute top-20 left-3 right-3 z-20 bg-red-100 text-red-700 text-sm px-3 py-2 rounded-lg shadow">{error}</div>
       )}
 
-      {alertTrip && !activeTrip && (
+      {offer && !activeTrip && online && (
         <div className="absolute inset-0 z-30 bg-black/40 flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-3 animate-pulse-once">
-            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">New request</p>
-            <p className="text-lg font-bold">
-              {alertTrip.tripType === "person" ? "Passenger ride" : "Goods delivery"}
-            </p>
-            <p className="text-sm text-gray-600">{alertTrip.distanceKm} km &middot; {alertTrip.price} RWF</p>
-            {alertTrip.goodsDescription && (
-              <p className="text-sm text-gray-500">{alertTrip.goodsDescription}</p>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="eyebrow">
+                  {offer.serviceClass}
+                  {offer.handling !== "ambient" ? ` · ${offer.handling}` : ""}
+                </p>
+                <p className="text-3xl font-bold mt-1">{formatRwf(offer.price)}</p>
+              </div>
+              {/* The ring drains as the exclusive hold runs out. */}
+              <div className="relative w-12 h-12 shrink-0">
+                <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
+                  <circle cx="18" cy="18" r="16" fill="none" stroke="#E2E2E2" strokeWidth="3" />
+                  <circle
+                    cx="18" cy="18" r="16" fill="none" stroke="#000000" strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 16}
+                    strokeDashoffset={2 * Math.PI * 16 * (1 - Math.min(1, secondsLeft / 20))}
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center text-sm font-bold tabular-nums">
+                  {secondsLeft}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2 border-y border-line py-3">
+              <div className="flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-ink shrink-0" />
+                <span className="text-base">
+                  {offer.pickupDistanceKm} km away &middot; {offer.etaMin} min to pickup
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="w-2.5 h-2.5 rounded-[2px] bg-muted shrink-0" />
+                <span className="text-base text-muted">
+                  {offer.tripType === "person" ? "Passenger" : "Goods"} &middot; {offer.distanceKm} km trip
+                </span>
+              </div>
+            </div>
+
+            {offer.goodsDescription && (
+              <p className="text-sm text-muted">{offer.goodsDescription}</p>
             )}
-            <div className="flex gap-3 pt-2">
+
+            <div className="flex gap-3">
               <button
-                onClick={() => setAlertTrip(null)}
-                disabled={accepting}
-                className="flex-1 bg-gray-200 text-gray-800 rounded-lg py-3.5 text-base font-semibold active:bg-gray-300 disabled:opacity-50"
+                onClick={() => handleDecline(offer.tripId)}
+                disabled={busy !== null}
+                className="btn-secondary flex-1"
               >
-                Dismiss
+                {busy === "decline" ? "Passing..." : "Pass"}
               </button>
               <button
-                onClick={() => handleAccept(alertTrip.id)}
-                disabled={accepting}
-                className="flex-1 bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                onClick={() => handleAccept(offer.tripId)}
+                disabled={busy !== null}
+                className="btn-primary flex-1"
               >
-                {accepting && (
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                )}
-                {accepting ? "Accepting..." : "Accept"}
+                {busy === "accept" ? "Accepting..." : "Accept"}
               </button>
             </div>
           </div>
@@ -297,29 +376,54 @@ export default function DriverPage() {
 
       {activeTrip && (
         <div className="absolute left-0 right-0 bottom-0 z-20">
-          <div className="bg-white rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] px-4 pt-4 pb-6 space-y-3">
-            <h2 className="font-semibold">Active trip</h2>
-            <p className="text-sm font-medium">
-              {activeTrip.tripType === "person" ? "Passenger" : "Goods delivery"}
+          <div className="sheet px-5 pt-4 pb-7 space-y-3 max-h-[70vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="eyebrow">
+                  {activeTrip.serviceClass}
+                  {activeTrip.handling !== "ambient" ? ` · ${activeTrip.handling}` : ""}
+                </p>
+                <p className="text-xl font-bold mt-0.5 capitalize">
+                  {activeTrip.status.replace("_", " ")}
+                </p>
+              </div>
+              <p className="text-2xl font-bold shrink-0">{formatRwf(activeTrip.price)}</p>
+            </div>
+            <p className="text-base text-muted">
+              {activeTrip.tripType === "person" ? "Passenger" : "Goods"} &middot; {activeTrip.distanceKm} km
             </p>
-            <p className="text-sm text-gray-600">{activeTrip.distanceKm} km &middot; {activeTrip.price} RWF</p>
             {activeTrip.goodsDescription && (
-              <p className="text-sm text-gray-500">{activeTrip.goodsDescription}</p>
+              <p className="text-sm text-muted">{activeTrip.goodsDescription}</p>
             )}
-            <p className="text-sm font-medium">Status: {activeTrip.status}</p>
 
             {activeTrip.status === "accepted" && (
-              <button
-                onClick={handleStartTrip}
-                disabled={starting}
-                className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold active:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {starting && (
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="space-y-2">
+                {!activeTrip.arrivedAt && (
+                  <button
+                    onClick={() => runTripAction("arrive", arriveAtPickup, "Pickup arrival recorded.", "Could not record arrival.")}
+                    disabled={busy !== null}
+                    className="btn-secondary"
+                  >
+                    {busy === "arrive" ? "Saving..." : "I have arrived at pickup"}
+                  </button>
                 )}
-                {starting ? "Starting..." : "Start trip"}
-              </button>
+                <button
+                  onClick={() => runTripAction("start", startTrip, "Trip started.", "Could not start the trip.")}
+                  disabled={busy !== null}
+                  className="btn-primary"
+                >
+                  {busy === "start" ? "Starting..." : "Start trip"}
+                </button>
+                <button
+                  onClick={() => runTripAction("cancel", cancelTrip, "Released back to other drivers.", "Could not release the job.")}
+                  disabled={busy !== null}
+                  className="btn-danger"
+                >
+                  {busy === "cancel" ? "Releasing..." : "Can't make it - release job"}
+                </button>
+              </div>
             )}
+
             {activeTrip.status === "in_progress" && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">
@@ -327,33 +431,71 @@ export default function DriverPage() {
                   {activeTrip.paymentStatus === "successful"
                     ? "Paid via Mobile Money"
                     : activeTrip.paymentStatus === "cash"
-                    ? "Marked paid in cash"
+                    ? "Paid in cash"
                     : activeTrip.paymentStatus === "pending"
                     ? "Waiting for Mobile Money confirmation..."
                     : "Not paid yet"}
                 </p>
-                {activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash" && (
+                {!paid && (
                   <button
-                    onClick={handleMarkCash}
-                    disabled={markingCash}
-                    className="w-full bg-amber-500 text-white rounded-lg py-3.5 text-base font-semibold active:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                    onClick={() => runTripAction("cash", markCashPayment, "Marked as paid in cash.", "Could not mark as paid in cash.")}
+                    disabled={busy !== null || activeTrip.paymentStatus === "pending"}
+                    className="btn-secondary"
                   >
-                    {markingCash && (
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    )}
-                    {markingCash ? "Marking..." : "Mark as paid in cash (system down)"}
+                    {busy === "cash" ? "Marking..." : "Take cash payment"}
                   </button>
                 )}
+                {needsProof && (
+                  <div className="space-y-2 bg-surface rounded-lg p-4">
+                    <p className="eyebrow">Proof of delivery</p>
+                    <p className="text-sm text-muted">
+                      Ask the recipient for the 4-digit code shown in the sender&apos;s app.
+                    </p>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={4}
+                      placeholder="4-digit code"
+                      aria-label="Delivery code"
+                      value={deliveryCode}
+                      onChange={(e) => setDeliveryCode(e.target.value.replace(/[^0-9]/g, ""))}
+                      className="field bg-white text-2xl font-bold tracking-[0.4em] text-center"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Received by (optional)"
+                      aria-label="Recipient name"
+                      value={recipientName}
+                      onChange={(e) => setRecipientName(e.target.value)}
+                      className="field bg-white"
+                    />
+                    <button
+                      onClick={submitProof}
+                      disabled={busy !== null || deliveryCode.length !== 4}
+                      className="btn-primary"
+                    >
+                      {busy === "proof" ? "Checking..." : "Confirm delivery"}
+                    </button>
+                  </div>
+                )}
+                {activeTrip.deliveryConfirmedAt && (
+                  <p className="text-base font-semibold">
+                    Delivery confirmed
+                    {activeTrip.recipientName ? ` by ${activeTrip.recipientName}` : ""}.
+                  </p>
+                )}
                 <button
-                  onClick={handleCompleteTrip}
-                  disabled={completing || (activeTrip.paymentStatus !== "successful" && activeTrip.paymentStatus !== "cash")}
-                  className="w-full bg-green-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-green-700 flex items-center justify-center gap-2"
+                  onClick={() => runTripAction("complete", completeTrip, "Job completed.", "Could not complete the job.")}
+                  disabled={busy !== null || needsProof}
+                  className="btn-primary"
                 >
-                  {completing && (
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  )}
-                  {completing ? "Completing..." : "Complete trip"}
+                  {busy === "complete" ? "Completing..." : paid ? "Complete job" : "Complete job (payment outstanding)"}
                 </button>
+                {!paid && (
+                  <p className="text-sm text-muted text-center">
+                    You can finish now; the unpaid amount stays on the record.
+                  </p>
+                )}
               </div>
             )}
           </div>

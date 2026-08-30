@@ -1,4 +1,4 @@
-﻿import aboutImg from "../assets/about-photo.jpg";
+import aboutImg from "../assets/about-photo.jpg";
 import Reveal from "./Reveal";
 
 export default function About() {

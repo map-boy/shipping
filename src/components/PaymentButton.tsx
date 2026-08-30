@@ -1,30 +1,63 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
-import { useToast } from "./Toast";
+import { useToast } from "../context/toast";
+import type { PaymentStatus } from "../lib/trips";
 
 interface Props {
   tripId: string;
   amount: number;
-  paymentStatus?: string;
+  paymentStatus?: PaymentStatus;
+}
+
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/[^0-9]/g, "");
+  if (digits.startsWith("250")) return digits;
+  if (digits.startsWith("0")) return "250" + digits.slice(1);
+  if (digits.startsWith("7")) return "250" + digits;
+  return digits;
 }
 
 export default function PaymentButton({ tripId, amount, paymentStatus }: Props) {
   const { showToast } = useToast();
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [requesting, setRequesting] = useState(false);
+  const [requested, setRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const prevStatusRef = useRef<string | undefined>(paymentStatus);
+  const prevStatusRef = useRef<PaymentStatus | undefined>(paymentStatus);
 
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
   }, []);
 
-  // Stop polling once Firestore/RTDB confirms a terminal state, and toast the outcome
+  // The server reads the reference id off the trip itself, so the client never
+  // has to hold or replay it.
+  const startPolling = useCallback(() => {
+    if (pollRef.current) return;
+    const checkMomoPaymentStatus = httpsCallable<{ tripId: string }, { status: string }>(
+      functions,
+      "checkMomoPaymentStatus"
+    );
+    pollRef.current = setInterval(() => {
+      checkMomoPaymentStatus({ tripId }).catch(() => {
+        // transient network / MoMo hiccup - the next tick tries again
+      });
+    }, 4000);
+  }, [tripId]);
+
+  useEffect(() => stopPolling, [stopPolling]);
+
   useEffect(() => {
+    if (paymentStatus === "pending") {
+      // Covers a reload in the middle of a payment as well as a fresh request.
+      startPolling();
+    } else if (paymentStatus === "successful" || paymentStatus === "failed") {
+      stopPolling();
+    }
+
     if (paymentStatus !== prevStatusRef.current) {
       if (paymentStatus === "successful") {
         showToast("Payment received. Thank you!", "success");
@@ -33,90 +66,66 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
       }
       prevStatusRef.current = paymentStatus;
     }
-
-    if (paymentStatus === "successful" || paymentStatus === "failed") {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-      setRequesting(false);
-    }
-  }, [paymentStatus, showToast]);
-
-  function normalizePhone(raw: string): string {
-    const digits = raw.replace(/[^0-9]/g, "");
-    if (digits.startsWith("250")) return digits;
-    if (digits.startsWith("0")) return "250" + digits.slice(1);
-    if (digits.startsWith("7")) return "250" + digits;
-    return digits;
-  }
+  }, [paymentStatus, showToast, startPolling, stopPolling]);
 
   async function handlePay() {
     setError(null);
-    if (!phoneNumber) {
+    if (!phoneNumber.trim()) {
       setError("Enter your Mobile Money phone number.");
       showToast("Enter your Mobile Money phone number.", "error");
       return;
     }
-    setRequesting(true);
+    setRequested(true);
 
     try {
-      const requestMomoPayment = httpsCallable(functions, "requestMomoPayment");
-      const result: any = await requestMomoPayment({ phoneNumber: normalizePhone(phoneNumber), tripId });
-      const referenceId = result.data.referenceId;
+      const requestMomoPayment = httpsCallable<{ phoneNumber: string; tripId: string }, { referenceId: string }>(
+        functions,
+        "requestMomoPayment"
+      );
+      await requestMomoPayment({ phoneNumber: normalizePhone(phoneNumber), tripId });
       showToast("Payment request sent. Check your phone to confirm.", "info");
-      pollStatus(referenceId);
-    } catch (err: any) {
-      setError(err.message || "Payment request failed.");
-      showToast(err.message || "Payment request failed. Please try again.", "error");
-      setRequesting(false);
+      startPolling();
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : "Payment request failed.";
+      setError(message);
+      showToast(message, "error");
+      setRequested(false);
     }
   }
 
-  function pollStatus(referenceId: string) {
-    const checkMomoPaymentStatus = httpsCallable(functions, "checkMomoPaymentStatus");
-    pollRef.current = setInterval(async () => {
-      try {
-        await checkMomoPaymentStatus({ referenceId, tripId });
-        // paymentStatus prop updates via the live trip listener in the parent;
-        // the effect above stops polling and toasts once it reaches a terminal state.
-      } catch {
-        // keep polling silently on transient errors
-      }
-    }, 4000);
-  }
-
   if (paymentStatus === "successful") {
-    return <p className="text-green-600 font-medium">Payment received. Thank you!</p>;
+    return <p className="text-center text-base font-semibold">Payment received. Thank you.</p>;
   }
 
-  const isPending = paymentStatus === "pending" || requesting;
+  const isPending = paymentStatus === "pending" || (requested && paymentStatus !== "failed");
 
   return (
-    <div className="p-4 border rounded-lg space-y-3">
-      <p className="font-medium">Pay {amount} via Mobile Money</p>
+    <div className="space-y-3">
+      <p className="eyebrow">Pay by Mobile Money</p>
       <input
         type="tel"
-        placeholder="e.g. 078XXXXXXX or 25078XXXXXXX"
+        inputMode="tel"
+        placeholder="e.g. 0781234567"
+        aria-label="Mobile Money phone number"
         value={phoneNumber}
         onChange={(e) => setPhoneNumber(e.target.value)}
-        className="w-full border rounded-lg px-3 py-3 text-base"
+        className="field"
         disabled={isPending}
       />
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {paymentStatus === "failed" && (
         <p className="text-red-600 text-sm">Payment failed. Please try again.</p>
       )}
-      {isPending && <p className="text-sm text-gray-500">Waiting for confirmation on your phone...</p>}
+      {isPending && <p className="text-sm text-muted">Check your phone to approve.</p>}
       <button
         onClick={handlePay}
         disabled={isPending}
-        className="w-full bg-blue-600 text-white rounded-lg py-3.5 text-base font-semibold disabled:opacity-50 active:bg-blue-700 flex items-center justify-center gap-2"
+        className="btn-primary"
       >
         {isPending && (
           <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
         )}
-        {isPending ? "Waiting..." : "Pay now"}
+        {isPending ? "Waiting..." : `Pay ${amount.toLocaleString()} RWF`}
       </button>
     </div>
   );

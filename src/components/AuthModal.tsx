@@ -56,10 +56,10 @@ export default function AuthModal({ onClose }: AuthModalProps) {
       <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6 relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+          className="absolute top-3 right-3 w-10 h-10 leading-none text-2xl text-gray-400 hover:text-gray-600"
           aria-label="Close"
         >
-          ?
+          {"\u00d7"}
         </button>
 
         <h2 className="text-xl font-bold text-gray-900 mb-6">

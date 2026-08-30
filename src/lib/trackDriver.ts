@@ -1,4 +1,4 @@
-﻿import { ref, onValue } from "firebase/database";
+import { ref, onValue } from "firebase/database";
 import { db } from "../firebase";
 
 export interface SingleDriverLocation {

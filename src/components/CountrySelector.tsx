@@ -1,4 +1,4 @@
-﻿import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 const countries = ["Australia", "Canada", "France", "Germany", "India", "Italy", "Brazil", "Mexico", "Spain", "United Kingdom", "USA"];
 
