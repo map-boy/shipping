@@ -1,6 +1,6 @@
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
-import type { Handling, ServiceClass, TripType, VehicleType } from "./catalog";
+import type { Handling, ServiceClass, TripType, VehicleType, TruckPackage } from "./catalog";
 
 export interface FareQuote {
   vehicleType: VehicleType;
@@ -51,6 +51,40 @@ export async function quoteFare(req: QuoteRequest): Promise<{
     functions,
     "quoteFare"
   );
+  const result = await fn(req);
+  return result.data;
+}
+
+export interface TruckFareQuote {
+  vehicleType: "truck";
+  distanceKm: number;
+  durationMin: number;
+  truckPackage: TruckPackage;
+  tonnes: number;
+  baseFare: number;
+  distanceFare: number;
+  price: number;
+  currency: "RWF";
+  promisedFrom: number;
+  promisedBy: number;
+}
+
+export interface TruckQuoteRequest {
+  pickup: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
+  truckPackage: TruckPackage;
+  tonnes: number;
+  routeDistanceKm?: number;
+  routeDurationMin?: number;
+}
+
+/**
+ * Truck freight has its own formula and its own callable - see
+ * computeTruckFare on the server. No auth required, so this can be called
+ * from a no-login quick-book form.
+ */
+export async function quoteTruckFare(req: TruckQuoteRequest): Promise<TruckFareQuote> {
+  const fn = httpsCallable<TruckQuoteRequest, TruckFareQuote>(functions, "quoteTruckFare");
   const result = await fn(req);
   return result.data;
 }

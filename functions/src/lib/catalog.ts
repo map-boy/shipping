@@ -26,6 +26,44 @@ export const VEHICLES: Record<VehicleType, VehicleSpec> = {
 };
 
 // ---------------------------------------------------------------------------
+// Truck freight (own pricing model, not part of the generic base+perKm fare)
+// ---------------------------------------------------------------------------
+
+/**
+ * "packaged" = boxed/crated goods billed by their actual weight (soap, steel...).
+ * "loose" = non-stackable cargo that takes the whole truck bed regardless of
+ * weight (furniture, household items...), so it is billed as a full 30t load.
+ */
+export type TruckPackage = "packaged" | "loose";
+
+export const TRUCK_PACKAGES: TruckPackage[] = ["packaged", "loose"];
+
+/** Truck bed capacity used to price "loose" (non-stackable) cargo. */
+export const TRUCK_LOOSE_TONNES = 30;
+
+/** Floor charge for packaged freight; the per-tonne-km rate is added on top. */
+export const TRUCK_PACKAGED_BASE_RWF = 250_000;
+
+/** Rate applied to (distanceKm x tonnes) for both truck package types. */
+export const TRUCK_RATE_PER_KM_TONNE = 0.25;
+
+export function parseTruckPackage(value: unknown): TruckPackage {
+  if (typeof value !== "string" || !TRUCK_PACKAGES.includes(value as TruckPackage)) {
+    throw new HttpsError("invalid-argument", `truckPackage must be one of: ${TRUCK_PACKAGES.join(", ")}.`);
+  }
+  return value as TruckPackage;
+}
+
+/** Packaged freight is billed by declared weight; loose freight ignores this. */
+export function parseTonnes(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n <= 0 || n > TRUCK_LOOSE_TONNES) {
+    throw new HttpsError("invalid-argument", `tonnes must be a number between 0 and ${TRUCK_LOOSE_TONNES}.`);
+  }
+  return n;
+}
+
+// ---------------------------------------------------------------------------
 // Service classes
 // ---------------------------------------------------------------------------
 

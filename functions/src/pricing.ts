@@ -2,7 +2,8 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import {
   VEHICLES, SERVICE_CLASS_SPECS, HANDLING_SPECS,
   parseVehicleType, parseServiceClass, parseHandling, assertServiceable, promisedWindow,
-  type VehicleType, type ServiceClass, type Handling,
+  parseTruckPackage, parseTonnes, TRUCK_LOOSE_TONNES, TRUCK_PACKAGED_BASE_RWF, TRUCK_RATE_PER_KM_TONNE,
+  type VehicleType, type ServiceClass, type Handling, type TruckPackage,
 } from "./lib/catalog";
 import { distanceKm, round1 } from "./lib/geo";
 import { requireLatLng } from "./lib/validate";
@@ -25,6 +26,11 @@ export interface FareBreakdown {
   currency: "RWF";
   promisedFrom: number;
   promisedBy: number;
+}
+
+export interface TruckFareBreakdown extends FareBreakdown {
+  truckPackage: TruckPackage;
+  tonnes: number;
 }
 
 /** Fares land on a round 10 RWF so drivers and riders see a clean number. */
@@ -88,8 +94,56 @@ export function computeFare(options: {
 }
 
 /**
+ * Truck freight has its own formula, not the generic base+perKm one:
+ *   packaged (billed by weight):  250,000 + (distanceKm x tonnes x 0.25)
+ *   loose (non-stackable, whole truck): distanceKm x 30 x 0.25
+ * Always immediate (express) and ambient - trucks are not offered a delivery
+ * window or temperature choice, so those fields are fixed rather than asked for.
+ */
+export function computeTruckFare(options: {
+  distanceKm: number;
+  durationMin?: number;
+  truckPackage: TruckPackage;
+  tonnes: number;
+  at?: number;
+}): TruckFareBreakdown {
+  const { distanceKm: km, truckPackage } = options;
+  const tonnes = truckPackage === "loose" ? TRUCK_LOOSE_TONNES : options.tonnes;
+
+  const distanceFare = roundFare(km * tonnes * TRUCK_RATE_PER_KM_TONNE);
+  const baseFare = truckPackage === "packaged" ? TRUCK_PACKAGED_BASE_RWF : 0;
+  const price = roundFare(baseFare + distanceFare);
+
+  const durationMin = options.durationMin ?? Math.round((km / FALLBACK_SPEED_KMH) * 60);
+  const at = options.at ?? Date.now();
+  const { promisedFrom, promisedBy } = promisedWindow("express", at);
+
+  return {
+    distanceKm: round1(km),
+    durationMin,
+    vehicleType: "truck",
+    serviceClass: "express",
+    handling: "ambient",
+    baseFare,
+    distanceFare,
+    subtotal: price,
+    serviceMultiplier: 1,
+    handlingMultiplier: 1,
+    surgeMultiplier: 1,
+    price,
+    currency: "RWF",
+    promisedFrom,
+    promisedBy,
+    truckPackage,
+    tonnes,
+  };
+}
+
+/**
  * Prices every vehicle that can serve the request in one call, so the booking
  * screen shows a real server-computed price per option instead of guessing.
+ * Truck is excluded here - it has its own quoteTruckFare below, since it needs
+ * a package type and tonnage the generic quote request does not carry.
  */
 export const quoteFare = onCall(async (request) => {
   const pickup = requireLatLng(request.data?.pickup, "pickup");
@@ -124,6 +178,7 @@ export const quoteFare = onCall(async (request) => {
   }
 
   const quotes = (Object.keys(VEHICLES) as VehicleType[])
+    .filter((vehicleType) => vehicleType !== "truck")
     .filter((vehicleType) => {
       try {
         assertServiceable(vehicleType, tripType, handling);
@@ -144,6 +199,35 @@ export const quoteFare = onCall(async (request) => {
     handling,
     market: market ?? { supply: 0, demand: 0, surgeMultiplier: 1, updatedAt: Date.now() },
   };
+});
+
+/**
+ * Standalone truck freight quote: pickup, destination, package type and
+ * tonnage in, one price out. No auth required - this is meant to be callable
+ * from a no-login quick-book form.
+ */
+export const quoteTruckFare = onCall(async (request) => {
+  const pickup = requireLatLng(request.data?.pickup, "pickup");
+  const destination = requireLatLng(request.data?.destination, "destination");
+  const truckPackage = parseTruckPackage(request.data?.truckPackage);
+  const tonnes = truckPackage === "loose" ? TRUCK_LOOSE_TONNES : parseTonnes(request.data?.tonnes);
+  const routeKm = request.data?.routeDistanceKm;
+  const routeMin = request.data?.routeDurationMin;
+
+  const straightKm = distanceKm(pickup, destination);
+  if (straightKm > 500) {
+    throw new HttpsError("invalid-argument", "That trip is too long to book here.");
+  }
+
+  const km =
+    typeof routeKm === "number" && Number.isFinite(routeKm) && routeKm >= straightKm * 0.9
+      ? routeKm
+      : straightKm;
+  const durationMin =
+    typeof routeMin === "number" && Number.isFinite(routeMin) && routeMin > 0 ? routeMin : undefined;
+
+  const fare = computeTruckFare({ distanceKm: km, durationMin, truckPackage, tonnes });
+  return { vehicleType: "truck" as const, ...fare };
 });
 
 /** Static catalog so the client never hardcodes prices, labels or windows. */

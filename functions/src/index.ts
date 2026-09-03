@@ -33,7 +33,7 @@ export {
 } from "./trip";
 
 // Pricing and catalog
-export { quoteFare, getCatalog } from "./pricing";
+export { quoteFare, quoteTruckFare, getCatalog } from "./pricing";
 
 // Marketplace
 export { marketConditions } from "./marketplace";

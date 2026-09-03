@@ -1,12 +1,17 @@
 /**
  * Client mirror of the server catalog. Labels and windows are safe to show from
- * here; prices are never computed client-side - quoteFare is the only source.
+ * here; prices are never computed client-side - quoteFare/quoteTruckFare are
+ * the only source.
  */
 
 export type VehicleType = "standard" | "car_hire" | "bus" | "truck" | "vip";
 export type ServiceClass = "express" | "first" | "second";
 export type Handling = "ambient" | "chilled" | "frozen";
 export type TripType = "person" | "goods";
+
+/** "packaged" = billed by weight. "loose" = non-stackable, billed as a full truck. */
+export type TruckPackage = "packaged" | "loose";
+export const TRUCK_LOOSE_TONNES = 30;
 
 export const VEHICLE_LABELS: Record<VehicleType, string> = {
   standard: "Standard car",
