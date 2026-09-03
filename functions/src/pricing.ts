@@ -227,7 +227,7 @@ export const quoteTruckFare = onCall(async (request) => {
     typeof routeMin === "number" && Number.isFinite(routeMin) && routeMin > 0 ? routeMin : undefined;
 
   const fare = computeTruckFare({ distanceKm: km, durationMin, truckPackage, tonnes });
-  return { vehicleType: "truck" as const, ...fare };
+  return { ...fare, vehicleType: "truck" as const };
 });
 
 /** Static catalog so the client never hardcodes prices, labels or windows. */
