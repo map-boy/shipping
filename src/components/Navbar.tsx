@@ -184,6 +184,7 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
                 </Link>
               </li>
               <li><Link to="/ride" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/ride") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Book a Ride</Link></li>
+              <li><Link to="/truck" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/truck") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Book a Truck</Link></li>
               <li><Link to="/driver" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/driver") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Drive with TikTak</Link></li>
               <li><a href="/#how" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white`}>How It Works</a></li>
               {services.map((s) => (
