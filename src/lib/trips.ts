@@ -1,8 +1,8 @@
 import { ref, onValue } from "firebase/database";
 import { db, functions } from "../firebase";
 import { httpsCallable } from "firebase/functions";
-import type { Handling, ServiceClass, TripType, VehicleType } from "./catalog";
-export type { Handling, ServiceClass, TripType, VehicleType } from "./catalog";
+import type { Handling, ServiceClass, TripType, VehicleType, TruckPackage } from "./catalog";
+export type { Handling, ServiceClass, TripType, VehicleType, TruckPackage } from "./catalog";
 import type { FareQuote } from "./pricing";
 
 export type TripStatus = "requested" | "accepted" | "in_progress" | "completed" | "cancelled" | "expired";
@@ -37,6 +37,9 @@ export interface TripRequest {
   arrivedAt?: number;
   startedAt?: number;
   goodsDescription?: string;
+  truckPackage?: TruckPackage;
+  tonnes?: number;
+  contactPhone?: string;
   paymentStatus?: PaymentStatus;
   paymentReferenceId?: string;
   paymentAmount?: number;
@@ -83,6 +86,9 @@ export interface CreateTripInput {
   pickup: { lat: number; lng: number };
   destination: { lat: number; lng: number };
   goodsDescription?: string;
+  truckPackage?: TruckPackage;
+  tonnes?: number;
+  contactPhone?: string;
   routeDistanceKm?: number;
   routeDurationMin?: number;
 }

@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, signInAnonymously, type User } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 import { getFunctions } from "firebase/functions";
 
@@ -19,3 +19,12 @@ export const auth = getAuth(app);
 export const db = getDatabase(app);
 export const functions = getFunctions(app);
 
+/**
+ * Used by no-login flows (truck quick-book) so createTrip's requireAuth still
+ * has a uid to work with, without ever showing the person a login screen.
+ */
+export async function ensureAnonymousAuth(): Promise<User> {
+  if (auth.currentUser) return auth.currentUser;
+  const cred = await signInAnonymously(auth);
+  return cred.user;
+}

@@ -4,8 +4,9 @@ import { requireAuth, requireString, requireLatLng } from "./lib/validate";
 import { areaKey, distanceKm, geohash } from "./lib/geo";
 import {
   parseVehicleType, parseServiceClass, parseHandling, assertServiceable,
+  parseTruckPackage, parseTonnes, TRUCK_LOOSE_TONNES,
 } from "./lib/catalog";
-import { computeFare } from "./pricing";
+import { computeFare, computeTruckFare } from "./pricing";
 import { refreshMarket } from "./marketplace";
 import { buildOfferUpdates, clearDispatchUpdates } from "./dispatch";
 import { tripEventUpdate } from "./lib/events";
@@ -36,14 +37,22 @@ export const createTrip = onCall(async (request) => {
   await assertNotBanned(uid);
 
   const data = request.data ?? {};
-  const tripType = data.tripType === "goods" ? "goods" : data.tripType === "person" ? "person" : null;
+  const vehicleType = parseVehicleType(data.vehicleType);
+  const isTruck = vehicleType === "truck";
+
+  // Truck freight is a fixed shape: always goods, always express, always
+  // ambient. It skips the service-class/temperature choices entirely.
+  const tripType = isTruck
+    ? "goods"
+    : data.tripType === "goods" ? "goods" : data.tripType === "person" ? "person" : null;
   if (!tripType) {
     throw new HttpsError("invalid-argument", "tripType must be 'person' or 'goods'.");
   }
 
-  const vehicleType = parseVehicleType(data.vehicleType);
-  const serviceClass = parseServiceClass(data.serviceClass, tripType === "person" ? "express" : "first");
-  const handling = parseHandling(data.handling);
+  const serviceClass = isTruck
+    ? "express"
+    : parseServiceClass(data.serviceClass, tripType === "person" ? "express" : "first");
+  const handling = isTruck ? "ambient" : parseHandling(data.handling);
   const pickup = requireLatLng(data.pickup, "pickup");
   const destination = requireLatLng(data.destination, "destination");
 
@@ -51,6 +60,15 @@ export const createTrip = onCall(async (request) => {
 
   if (data.goodsDescription !== undefined && typeof data.goodsDescription !== "string") {
     throw new HttpsError("invalid-argument", "goodsDescription must be a string.");
+  }
+
+  let truckPackage: "packaged" | "loose" | undefined;
+  let tonnes: number | undefined;
+  let contactPhone: string | undefined;
+  if (isTruck) {
+    truckPackage = parseTruckPackage(data.truckPackage);
+    tonnes = truckPackage === "loose" ? TRUCK_LOOSE_TONNES : parseTonnes(data.tonnes);
+    contactPhone = requireString(data.contactPhone, "contactPhone").slice(0, 20);
   }
 
   const straightKm = distanceKm(pickup, destination);
@@ -67,17 +85,20 @@ export const createTrip = onCall(async (request) => {
     typeof routeMin === "number" && Number.isFinite(routeMin) && routeMin > 0 ? routeMin : undefined;
 
   // Surge is read here, on the server, at the moment of booking. A pricing
-  // outage falls back to no surge rather than blocking the booking.
+  // outage falls back to no surge rather than blocking the booking. Truck
+  // freight is priced by its own weight-based formula and never surges.
   let surgeMultiplier = 1;
-  try {
-    surgeMultiplier = (await refreshMarket(pickup)).surgeMultiplier;
-  } catch (err) {
-    console.error("surge lookup failed during createTrip, booking at base fare:", err);
+  if (!isTruck) {
+    try {
+      surgeMultiplier = (await refreshMarket(pickup)).surgeMultiplier;
+    } catch (err) {
+      console.error("surge lookup failed during createTrip, booking at base fare:", err);
+    }
   }
 
-  const fare = computeFare({
-    distanceKm: km, durationMin, vehicleType, serviceClass, handling, surgeMultiplier,
-  });
+  const fare = isTruck
+    ? computeTruckFare({ distanceKm: km, durationMin, truckPackage: truckPackage!, tonnes: tonnes! })
+    : computeFare({ distanceKm: km, durationMin, vehicleType, serviceClass, handling, surgeMultiplier });
 
   const createdAt = Date.now();
   const description =
@@ -116,6 +137,8 @@ export const createTrip = onCall(async (request) => {
     expiresAt: createdAt + REQUEST_TTL_MS,
     ...(deliveryCode ? { deliveryCode } : {}),
     ...(description ? { goodsDescription: description } : {}),
+    ...(truckPackage ? { truckPackage, tonnes } : {}),
+    ...(contactPhone ? { contactPhone } : {}),
   };
 
   const updates: Record<string, unknown> = {
