@@ -109,6 +109,9 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
             <Link to="/ride" className={`relative pb-1 transition-colors hover:text-white/70 rounded ${focusRing} focus-visible:ring-offset-black ${isActive("/ride") ? "text-white after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-white after:rounded-full" : ""}`}>
               Book a Ride
             </Link>
+            <Link to="/truck" className={`relative pb-1 transition-colors hover:text-white/70 rounded ${focusRing} focus-visible:ring-offset-black ${isActive("/truck") ? "text-white after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-white after:rounded-full" : ""}`}>
+              Book a Truck
+            </Link>
             <Link to="/driver" className={`relative pb-1 transition-colors hover:text-white/70 rounded ${focusRing} focus-visible:ring-offset-black ${isActive("/driver") ? "text-white after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-white after:rounded-full" : ""}`}>
               Drive with TikTak
             </Link>
