@@ -104,6 +104,20 @@ export default function RidePage() {
       <LiveMap
         onLocationChange={setUserLocation}
         trackedDriverId={trackedDriverId}
+        destination={
+          activeTrip && trackedDriverId
+            ? activeTrip.destination
+            : destination
+            ? { lat: destination.lat, lng: destination.lng }
+            : null
+        }
+        tripStatus={
+          activeTrip?.status === "in_progress"
+            ? "in_progress"
+            : activeTrip?.status === "accepted"
+            ? "accepted"
+            : null
+        }
         onRequestVehicle={(v) => {
           setPreselectedVehicle(v);
           if (!destination) setPickingDestination(true);

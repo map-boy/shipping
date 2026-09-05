@@ -15,6 +15,7 @@ const Profile = lazy(() => import("./components/Profile"));
 const ServicePage = lazy(() => import("./components/ServicePage"));
 const CartPage = lazy(() => import("./components/CartPage"));
 const TruckBookingForm = lazy(() => import("./components/TruckBookingForm"));
+const DriverSimulator = lazy(() => import("./components/DriverSimulator"));
 
 function RouteLoading() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
                 <Route path="/services/:slug" element={<ServicePage />} />
                 <Route path="/cart" element={<CartPage />} />
                 <Route path="/truck" element={<TruckBookingForm />} />
+                <Route path="/driver/simulate" element={<DriverSimulator />} />
               </Routes>
             </Suspense>
             <Footer />

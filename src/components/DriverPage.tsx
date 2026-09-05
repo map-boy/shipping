@@ -12,6 +12,8 @@ import { VEHICLE_LABELS, formatRwf, type VehicleType } from "../lib/catalog";
 import type { User } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { useToast } from "../context/toast";
+import { devToolsEnabled } from "../lib/devTools";
+import { Link } from "react-router-dom";
 
 const VEHICLE_OPTIONS = Object.entries(VEHICLE_LABELS) as [VehicleType, string][];
 
@@ -291,6 +293,15 @@ export default function DriverPage() {
           />
           Cold chain
         </label>
+
+        {devToolsEnabled && (
+          <Link
+            to="/driver/simulate"
+            className="px-4 py-3 rounded-lg bg-white shadow-[0_2px_10px_rgba(0,0,0,0.14)] text-sm font-semibold"
+          >
+            Simulate
+          </Link>
+        )}
 
         <button
           onClick={() => setOnline((v) => !v)}
