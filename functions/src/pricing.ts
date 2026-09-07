@@ -3,6 +3,7 @@ import {
   VEHICLES, SERVICE_CLASS_SPECS, HANDLING_SPECS,
   parseVehicleType, parseServiceClass, parseHandling, assertServiceable, promisedWindow,
   parseTruckPackage, parseTonnes, TRUCK_LOOSE_TONNES, TRUCK_PACKAGED_BASE_RWF, TRUCK_RATE_PER_KM_TONNE,
+  BUS_SEATS, BUS_RATE_PER_KM_SEAT, BUS_MINIMUM_RWF, BUS_MINIMUM_EACH_WAY_KM,
   type VehicleType, type ServiceClass, type Handling, type TruckPackage,
 } from "./lib/catalog";
 import { distanceKm, round1 } from "./lib/geo";
@@ -90,6 +91,72 @@ export function computeFare(options: {
     currency: "RWF",
     promisedFrom,
     promisedBy,
+  };
+}
+
+export interface BusFareBreakdown extends FareBreakdown {
+  seats: number;
+  ratePerKmSeat: number;
+  /** One-way road distance between pickup and destination. */
+  eachWayKm: number;
+  /** What is actually billed: the bus drives out and back, so each-way x 2. */
+  billableKm: number;
+  roundTrip: true;
+  minimumApplied: boolean;
+}
+
+/**
+ * Bus charter. The whole vehicle is hired for the round trip, so the billed
+ * distance is each-way x 2 and the seat count is the bus capacity rather than
+ * however many people actually travel.
+ *
+ *   round trip <= 100 km:  flat 200,000 RWF
+ *   beyond that:           90 x 29 x round-trip km
+ *
+ * Service class, temperature and surge do not apply: this is a quoted charter
+ * rate, not metered work competing for a driver right now.
+ */
+export function computeBusFare(options: {
+  distanceKm: number;
+  durationMin?: number;
+  at?: number;
+}): BusFareBreakdown {
+  const eachWayKm = round1(options.distanceKm);
+  const billableKm = round1(eachWayKm * 2);
+
+  const metered = BUS_RATE_PER_KM_SEAT * BUS_SEATS * billableKm;
+  const withinMinimum = eachWayKm <= BUS_MINIMUM_EACH_WAY_KM;
+
+  // The floor is applied above the threshold too, so a future rate change can
+  // never quote a charter below the agreed minimum.
+  const price = withinMinimum ? BUS_MINIMUM_RWF : Math.max(BUS_MINIMUM_RWF, roundFare(metered));
+
+  const durationMin = options.durationMin ?? Math.round((eachWayKm / FALLBACK_SPEED_KMH) * 60);
+  const at = options.at ?? Date.now();
+  const { promisedFrom, promisedBy } = promisedWindow("express", at);
+
+  return {
+    distanceKm: eachWayKm,
+    durationMin,
+    vehicleType: "bus",
+    serviceClass: "express",
+    handling: "ambient",
+    baseFare: withinMinimum ? BUS_MINIMUM_RWF : 0,
+    distanceFare: withinMinimum ? 0 : roundFare(metered),
+    subtotal: price,
+    serviceMultiplier: 1,
+    handlingMultiplier: 1,
+    surgeMultiplier: 1,
+    price,
+    currency: "RWF",
+    promisedFrom,
+    promisedBy,
+    seats: BUS_SEATS,
+    ratePerKmSeat: BUS_RATE_PER_KM_SEAT,
+    eachWayKm,
+    billableKm,
+    roundTrip: true,
+    minimumApplied: withinMinimum,
   };
 }
 
@@ -190,7 +257,11 @@ export const quoteFare = onCall(async (request) => {
     .map((vehicleType) => ({
       label: VEHICLES[vehicleType].label,
       maxLoadKg: VEHICLES[vehicleType].maxLoadKg,
-      ...computeFare({ distanceKm: km, durationMin, vehicleType, serviceClass, handling, surgeMultiplier }),
+      // Bus is a whole-vehicle round-trip charter, so it is priced by its own
+      // tariff even when it appears alongside metered vehicles.
+      ...(vehicleType === "bus"
+        ? computeBusFare({ distanceKm: km, durationMin })
+        : computeFare({ distanceKm: km, durationMin, vehicleType, serviceClass, handling, surgeMultiplier })),
     }));
 
   return {
@@ -199,6 +270,28 @@ export const quoteFare = onCall(async (request) => {
     handling,
     market: market ?? { supply: 0, demand: 0, surgeMultiplier: 1, updatedAt: Date.now() },
   };
+});
+
+/** Standalone bus charter quote: pickup and destination, priced as a round trip. */
+export const quoteBusFare = onCall(async (request) => {
+  const pickup = requireLatLng(request.data?.pickup, "pickup");
+  const destination = requireLatLng(request.data?.destination, "destination");
+
+  const straightKm = distanceKm(pickup, destination);
+  if (straightKm > 500) {
+    throw new HttpsError("invalid-argument", "That trip is too long to book here.");
+  }
+
+  const routeKm = request.data?.routeDistanceKm;
+  const km =
+    typeof routeKm === "number" && Number.isFinite(routeKm) && routeKm >= straightKm * 0.9
+      ? routeKm
+      : straightKm;
+  const routeMin = request.data?.routeDurationMin;
+  const durationMin =
+    typeof routeMin === "number" && Number.isFinite(routeMin) && routeMin > 0 ? routeMin : undefined;
+
+  return { ...computeBusFare({ distanceKm: km, durationMin }), vehicleType: "bus" as const };
 });
 
 /**

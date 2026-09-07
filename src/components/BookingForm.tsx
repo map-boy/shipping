@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { auth } from "../firebase";
 import {
   SERVICE_CLASSES, HANDLING_OPTIONS, formatRwf,
+  BUS_SEATS, BUS_RATE_PER_KM_SEAT, BUS_MINIMUM_RWF, BUS_MINIMUM_EACH_WAY_KM,
   type Handling, type ServiceClass, type TripType, type VehicleType,
 } from "../lib/catalog";
 import { quoteFare, type FareQuote, type MarketSnapshot } from "../lib/pricing";
@@ -234,16 +235,43 @@ export default function BookingForm({
               <span className="flex items-center gap-3 min-w-0">
                 <span className="text-2xl shrink-0" aria-hidden="true">{VEHICLE_GLYPH[q.vehicleType]}</span>
                 <span className="min-w-0">
-                  <span className="block font-semibold truncate">{q.label}</span>
+                  <span className="block font-semibold truncate">
+                    {q.label}
+                    {q.roundTrip ? " charter" : ""}
+                  </span>
                   <span className="block text-sm text-muted truncate">
-                    {windowLabel(q.promisedBy, q.serviceClass)} &middot; {q.distanceKm} km
-                    {q.maxLoadKg ? ` · ${q.maxLoadKg} kg` : ""}
+                    {q.roundTrip
+                      ? `${q.seats} seats · ${q.billableKm} km return`
+                      : `${windowLabel(q.promisedBy, q.serviceClass)} · ${q.distanceKm} km${
+                          q.maxLoadKg ? ` · ${q.maxLoadKg} kg` : ""
+                        }`}
                   </span>
                 </span>
               </span>
               <span className="font-semibold shrink-0 ml-3">{formatRwf(q.price)}</span>
             </button>
           ))}
+        </div>
+      )}
+
+      {selected?.roundTrip && (
+        <div className="rounded-lg bg-surface px-4 py-3 space-y-1">
+          <p className="eyebrow">How this charter is priced</p>
+          {selected.minimumApplied ? (
+            <p className="text-sm">
+              Up to {BUS_MINIMUM_EACH_WAY_KM} km each way is a flat{" "}
+              <span className="font-semibold">{formatRwf(BUS_MINIMUM_RWF)}</span> minimum.
+            </p>
+          ) : (
+            <p className="text-sm">
+              {BUS_RATE_PER_KM_SEAT} RWF &times; {BUS_SEATS} seats &times; {selected.billableKm} km
+              return = <span className="font-semibold">{formatRwf(selected.price)}</span>
+            </p>
+          )}
+          <p className="text-sm text-muted">
+            {selected.eachWayKm} km each way, billed both ways. The whole bus is hired, so
+            speed and temperature options do not change the price.
+          </p>
         </div>
       )}
 

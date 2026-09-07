@@ -36,33 +36,67 @@ function buildVehicleIcon(vehicleType: VehicleType, color: string, size = 36): g
   };
 }
 
-function animateMarkerTo(marker: google.maps.Marker, to: google.maps.LatLngLiteral, duration = 800) {
+/**
+ * Slides a marker to its new position and returns the frame handle so the caller
+ * can cancel it. Without cancellation, two updates arriving inside one animation
+ * leave two rAF loops fighting over setPosition, which reads as jitter.
+ */
+function animateMarkerTo(
+  marker: google.maps.Marker,
+  to: google.maps.LatLngLiteral,
+  duration = 900
+): number | null {
   const from = marker.getPosition();
   if (!from) {
     marker.setPosition(to);
-    return;
+    return null;
   }
   const fromLat = from.lat();
   const fromLng = from.lng();
-  if (fromLat === to.lat && fromLng === to.lng) return;
+  if (fromLat === to.lat && fromLng === to.lng) return null;
   const start = performance.now();
+  let handle: number;
 
   function step(now: number) {
     const t = Math.min(1, (now - start) / duration);
-    marker.setPosition({ lat: fromLat + (to.lat - fromLat) * t, lng: fromLng + (to.lng - fromLng) * t });
-    if (t < 1) requestAnimationFrame(step);
+    // ease-out so the vehicle settles rather than stopping dead
+    const e = 1 - (1 - t) * (1 - t);
+    marker.setPosition({ lat: fromLat + (to.lat - fromLat) * e, lng: fromLng + (to.lng - fromLng) * e });
+    if (t < 1) handle = requestAnimationFrame(step);
   }
-  requestAnimationFrame(step);
+  handle = requestAnimationFrame(step);
+  return handle;
+}
+
+function straightLineKm(a: google.maps.LatLngLiteral, b: google.maps.LatLngLiteral): number {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(h));
 }
 
 interface Props {
   onLocationChange?: (loc: [number, number]) => void;
   trackedDriverId?: string | null;
+  /** Drop-off point. Drawn once a driver is assigned so the rider sees the whole leg. */
+  destination?: { lat: number; lng: number } | null;
+  /** Drives what the route is measured to: the rider before pickup, the destination after. */
+  tripStatus?: "accepted" | "in_progress" | null;
   onRequestVehicle?: (vehicleType: VehicleType) => void;
   fullScreen?: boolean;
 }
 
-export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVehicle, fullScreen }: Props) {
+export default function LiveMap({
+  onLocationChange,
+  trackedDriverId,
+  destination,
+  tripStatus,
+  onRequestVehicle,
+  fullScreen,
+}: Props) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<google.maps.Map | null>(null);
   const googleRef = useRef<typeof google | null>(null);
@@ -70,14 +104,44 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
   const driverMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
   const driverInfoWindowsRef = useRef<Map<string, google.maps.InfoWindow>>(new Map());
   const trackedMarkerRef = useRef<google.maps.Marker | null>(null);
+  const destMarkerRef = useRef<google.maps.Marker | null>(null);
   const routeLineRef = useRef<google.maps.Polyline | null>(null);
   const lastRouteFetchRef = useRef(0);
+  const trackedAnimRef = useRef<number | null>(null);
+  const userAnimRef = useRef<number | null>(null);
+
+  // The driver subscription must not restart every time the rider's own GPS ticks,
+  // so everything it reads that changes often lives in a ref instead of a dep.
+  const userLocationRef = useRef<[number, number] | null>(null);
+  const destinationRef = useRef<{ lat: number; lng: number } | null>(null);
+  const tripStatusRef = useRef<Props["tripStatus"]>(null);
+  const followRef = useRef(true);
+  /** Which leg the map has already framed, so each leg is fitted exactly once. */
+  const fittedLegRef = useRef<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [vehicleFilter, setVehicleFilter] = useState<VehicleType | "all">("all");
   const [nearbyDrivers, setNearbyDrivers] = useState<DriverLocation[]>([]);
   const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
+  const [following, setFollowing] = useState(true);
+  const [driverSeen, setDriverSeen] = useState(false);
+
+  useEffect(() => {
+    userLocationRef.current = userLocation;
+  }, [userLocation]);
+
+  useEffect(() => {
+    destinationRef.current = destination ?? null;
+  }, [destination]);
+
+  useEffect(() => {
+    tripStatusRef.current = tripStatus ?? null;
+  }, [tripStatus]);
+
+  useEffect(() => {
+    followRef.current = following;
+  }, [following]);
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
@@ -100,6 +164,11 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
             strictBounds: false,
           },
         });
+
+        // Uber follows the car until you touch the map, then leaves you alone and
+        // offers a recentre. Fighting the user's pan on every position update is
+        // what made the map feel broken before.
+        map.current.addListener("dragstart", () => setFollowing(false));
 
         if (!navigator.geolocation) {
           setError("Geolocation not supported by this browser.");
@@ -127,7 +196,8 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
               });
               map.current!.setCenter({ lat: latitude, lng: longitude });
             } else {
-              animateMarkerTo(userMarkerRef.current, { lat: latitude, lng: longitude });
+              if (userAnimRef.current !== null) cancelAnimationFrame(userAnimRef.current);
+              userAnimRef.current = animateMarkerTo(userMarkerRef.current, { lat: latitude, lng: longitude });
             }
           },
           (err) => setError(err.message),
@@ -207,80 +277,130 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
 
   useEffect(() => {
     const google = googleRef.current;
-    if (!trackedDriverId || !map.current || !google) {
+
+    const clearTracking = () => {
+      if (trackedAnimRef.current !== null) cancelAnimationFrame(trackedAnimRef.current);
+      trackedAnimRef.current = null;
       trackedMarkerRef.current?.setMap(null);
       trackedMarkerRef.current = null;
-      routeLineRef.current?.setMap(null);
-      routeLineRef.current = null;
-      setRouteInfo(null);
-      return;
-    }
-
-    const unsubscribe = listenToDriverLocation(trackedDriverId, (loc) => {
-      if (!loc || !map.current) return;
-      const position = { lat: loc.lat, lng: loc.lng };
-
-      if (!trackedMarkerRef.current) {
-        trackedMarkerRef.current = new google.maps.Marker({
-          position,
-          map: map.current,
-          icon: buildVehicleIcon("standard", "#dc2626"),
-        });
-      } else {
-        animateMarkerTo(trackedMarkerRef.current, position);
-      }
-
-      if (userLocation) {
-        const bounds = new google.maps.LatLngBounds();
-        bounds.extend(position);
-        bounds.extend({ lat: userLocation[1], lng: userLocation[0] });
-
-        const listener = google.maps.event.addListener(map.current, "bounds_changed", () => {
-          if ((map.current!.getZoom() ?? 0) > 15) map.current!.setZoom(15);
-          google.maps.event.removeListener(listener);
-        });
-        map.current.fitBounds(bounds, 80);
-
-        const now = Date.now();
-        if (now - lastRouteFetchRef.current > 4000) {
-          lastRouteFetchRef.current = now;
-          fetchRoute(google, [position.lng, position.lat], [userLocation[0], userLocation[1]])
-            .then((route) => {
-              if (!route || !map.current) return;
-
-              setRouteInfo({ distanceKm: route.distanceKm, durationMin: route.durationMin });
-
-              const path = route.path;
-
-              if (!routeLineRef.current) {
-                routeLineRef.current = new google.maps.Polyline({
-                  path,
-                  map: map.current,
-                  strokeColor: "#2563eb",
-                  strokeOpacity: 0.9,
-                  strokeWeight: 5,
-                });
-              } else {
-                routeLineRef.current.setPath(path);
-              }
-            })
-            .catch(() => {
-              const [dLng, dLat] = [position.lng - userLocation[0], position.lat - userLocation[1]];
-              const distanceKm = Math.sqrt(dLng * dLng + dLat * dLat) * 111;
-              setRouteInfo({ distanceKm: Math.round(distanceKm * 10) / 10, durationMin: Math.round(distanceKm * 3) });
-            });
-        }
-      }
-    });
-
-    return () => {
-      unsubscribe();
-      trackedMarkerRef.current?.setMap(null);
-      trackedMarkerRef.current = null;
+      destMarkerRef.current?.setMap(null);
+      destMarkerRef.current = null;
       routeLineRef.current?.setMap(null);
       routeLineRef.current = null;
     };
-  }, [trackedDriverId, userLocation]);
+
+    if (!trackedDriverId || !map.current || !google) {
+      clearTracking();
+      setRouteInfo(null);
+      setDriverSeen(false);
+      return;
+    }
+
+    const drawRouteTo = (from: google.maps.LatLngLiteral, to: google.maps.LatLngLiteral) => {
+      const now = Date.now();
+      if (now - lastRouteFetchRef.current < 4000) return;
+      lastRouteFetchRef.current = now;
+
+      fetchRoute(google, [from.lng, from.lat], [to.lng, to.lat]).then((route) => {
+        if (!map.current) return;
+
+        // fetchRoute swallows its own errors and resolves null, so the fallback
+        // has to live here - a .catch() would never run.
+        if (!route) {
+          const km = straightLineKm(from, to);
+          setRouteInfo({ distanceKm: Math.round(km * 10) / 10, durationMin: Math.max(1, Math.round(km * 3)) });
+          return;
+        }
+
+        setRouteInfo({ distanceKm: route.distanceKm, durationMin: route.durationMin });
+
+        if (!routeLineRef.current) {
+          routeLineRef.current = new google.maps.Polyline({
+            path: route.path,
+            map: map.current,
+            strokeColor: "#000000",
+            strokeOpacity: 0.85,
+            strokeWeight: 5,
+          });
+        } else {
+          routeLineRef.current.setPath(route.path);
+        }
+      });
+    };
+
+    const unsubscribe = listenToDriverLocation(
+      trackedDriverId,
+      (loc) => {
+        if (!loc || !map.current) return;
+        const position = { lat: loc.lat, lng: loc.lng };
+        setDriverSeen(true);
+
+        if (!trackedMarkerRef.current) {
+          trackedMarkerRef.current = new google.maps.Marker({
+            position,
+            map: map.current,
+            icon: buildVehicleIcon(loc.vehicleType, "#000000", 40),
+            zIndex: 900,
+          });
+        } else {
+          if (trackedAnimRef.current !== null) cancelAnimationFrame(trackedAnimRef.current);
+          trackedAnimRef.current = animateMarkerTo(trackedMarkerRef.current, position);
+        }
+
+        // Before pickup the rider watches the car come to them; once the trip is
+        // under way the leg that matters is car -> drop-off.
+        const dest = destinationRef.current;
+        const rider = userLocationRef.current;
+        const heading = tripStatusRef.current === "in_progress" ? dest : rider ? { lat: rider[1], lng: rider[0] } : null;
+
+        if (dest) {
+          if (!destMarkerRef.current) {
+            destMarkerRef.current = new google.maps.Marker({
+              position: dest,
+              map: map.current,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 7,
+                fillColor: "#000000",
+                fillOpacity: 1,
+                strokeColor: "white",
+                strokeWeight: 2.5,
+              },
+              zIndex: 800,
+            });
+          } else {
+            destMarkerRef.current.setPosition(dest);
+          }
+        }
+
+        if (!heading) return;
+
+        // One fit per leg to frame both ends, then follow by panning only. Calling
+        // fitBounds on every update was what pinned the zoom and blocked panning.
+        const legKey = `${trackedDriverId}:${tripStatusRef.current ?? ""}`;
+        if (fittedLegRef.current !== legKey) {
+          fittedLegRef.current = legKey;
+          const bounds = new google.maps.LatLngBounds();
+          bounds.extend(position);
+          bounds.extend(heading);
+          map.current.fitBounds(bounds, 90);
+        } else if (followRef.current) {
+          map.current.panTo(position);
+        }
+
+        drawRouteTo(position, heading);
+      },
+      (err) => setError(err.message)
+    );
+
+    return () => {
+      unsubscribe();
+      clearTracking();
+    };
+    // Deliberately only trackedDriverId: the rider's own position, the destination
+    // and the trip status are read from refs so a GPS tick cannot tear down the
+    // subscription and destroy the vehicle marker mid-animation.
+  }, [trackedDriverId]);
 
   const mapHeightClass = fullScreen ? "w-full h-full" : "relative w-full h-[240px] sm:h-[320px] md:h-[420px] rounded-2xl overflow-hidden border border-gray-200 shadow-md";
 
@@ -328,9 +448,49 @@ export default function LiveMap({ onLocationChange, trackedDriverId, onRequestVe
         </p>
       )}
       {trackedDriverId && (
-        <p className={fullScreen ? "absolute top-3 left-3 right-3 z-20 bg-white shadow px-3 py-2 rounded-lg text-sm text-gray-600" : "mt-2 text-sm text-gray-600"}>
-          Your driver is on the way{routeInfo ? ` \u2014 ${routeInfo.distanceKm} km, about ${routeInfo.durationMin} min away` : ""}.
-        </p>
+        <>
+          <div
+            className={
+              fullScreen
+                ? "absolute top-3 left-3 right-3 z-20 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.16)] px-4 py-3 rounded-xl"
+                : "mt-2"
+            }
+          >
+            {!driverSeen ? (
+              <p className="text-sm text-muted">Waiting for your driver&apos;s location...</p>
+            ) : (
+              <>
+                <p className="text-base font-semibold">
+                  {tripStatus === "in_progress" ? "On the way to your destination" : "Your driver is on the way"}
+                </p>
+                <p className="text-sm text-muted">
+                  {routeInfo
+                    ? `${routeInfo.distanceKm} km \u00b7 about ${routeInfo.durationMin} min`
+                    : "Measuring the route..."}
+                </p>
+              </>
+            )}
+          </div>
+
+          {/* Only offered once the rider has panned away, so it never nags. */}
+          {!following && (
+            <button
+              onClick={() => {
+                setFollowing(true);
+                const pos = trackedMarkerRef.current?.getPosition();
+                if (pos && map.current) map.current.panTo(pos);
+              }}
+              className="absolute bottom-4 right-4 z-20 w-12 h-12 rounded-full bg-white shadow-[0_2px_12px_rgba(0,0,0,0.2)] flex items-center justify-center active:bg-surface"
+              aria-label="Follow the vehicle"
+            >
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
+                <circle cx="12" cy="12" r="7" />
+                <path strokeLinecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+              </svg>
+            </button>
+          )}
+        </>
       )}
     </div>
   );

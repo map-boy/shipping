@@ -59,3 +59,11 @@ export function canCarry(vehicleType: VehicleType, tripType: TripType): boolean 
 export function formatRwf(amount: number): string {
   return `${amount.toLocaleString()} RWF`;
 }
+/**
+ * Bus charter tariff, mirrored for display only. The server is the sole authority
+ * on what is charged; these exist so the booking screen can explain the rate.
+ */
+export const BUS_SEATS = 29;
+export const BUS_RATE_PER_KM_SEAT = 90;
+export const BUS_MINIMUM_RWF = 200_000;
+export const BUS_MINIMUM_EACH_WAY_KM = 50;

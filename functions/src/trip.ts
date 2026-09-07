@@ -6,7 +6,7 @@ import {
   parseVehicleType, parseServiceClass, parseHandling, assertServiceable,
   parseTruckPackage, parseTonnes, TRUCK_LOOSE_TONNES,
 } from "./lib/catalog";
-import { computeFare, computeTruckFare } from "./pricing";
+import { computeFare, computeTruckFare, computeBusFare } from "./pricing";
 import { refreshMarket } from "./marketplace";
 import { buildOfferUpdates, clearDispatchUpdates } from "./dispatch";
 import { tripEventUpdate } from "./lib/events";
@@ -39,6 +39,8 @@ export const createTrip = onCall(async (request) => {
   const data = request.data ?? {};
   const vehicleType = parseVehicleType(data.vehicleType);
   const isTruck = vehicleType === "truck";
+  // A bus is chartered whole for a round trip: fixed tariff, no surge, no classes.
+  const isBus = vehicleType === "bus";
 
   // Truck freight is a fixed shape: always goods, always express, always
   // ambient. It skips the service-class/temperature choices entirely.
@@ -49,10 +51,10 @@ export const createTrip = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "tripType must be 'person' or 'goods'.");
   }
 
-  const serviceClass = isTruck
+  const serviceClass = isTruck || isBus
     ? "express"
     : parseServiceClass(data.serviceClass, tripType === "person" ? "express" : "first");
-  const handling = isTruck ? "ambient" : parseHandling(data.handling);
+  const handling = isTruck || isBus ? "ambient" : parseHandling(data.handling);
   const pickup = requireLatLng(data.pickup, "pickup");
   const destination = requireLatLng(data.destination, "destination");
 
@@ -88,7 +90,7 @@ export const createTrip = onCall(async (request) => {
   // outage falls back to no surge rather than blocking the booking. Truck
   // freight is priced by its own weight-based formula and never surges.
   let surgeMultiplier = 1;
-  if (!isTruck) {
+  if (!isTruck && !isBus) {
     try {
       surgeMultiplier = (await refreshMarket(pickup)).surgeMultiplier;
     } catch (err) {
@@ -98,6 +100,8 @@ export const createTrip = onCall(async (request) => {
 
   const fare = isTruck
     ? computeTruckFare({ distanceKm: km, durationMin, truckPackage: truckPackage!, tonnes: tonnes! })
+    : isBus
+    ? computeBusFare({ distanceKm: km, durationMin })
     : computeFare({ distanceKm: km, durationMin, vehicleType, serviceClass, handling, surgeMultiplier });
 
   const createdAt = Date.now();
