@@ -20,6 +20,13 @@ export interface FareQuote {
   currency: "RWF";
   promisedFrom: number;
   promisedBy: number;
+  /** Present only on bus quotes, which are whole-vehicle round-trip charters. */
+  seats?: number;
+  ratePerKmSeat?: number;
+  eachWayKm?: number;
+  billableKm?: number;
+  roundTrip?: true;
+  minimumApplied?: boolean;
 }
 
 export interface MarketSnapshot {
@@ -85,6 +92,27 @@ export interface TruckQuoteRequest {
  */
 export async function quoteTruckFare(req: TruckQuoteRequest): Promise<TruckFareQuote> {
   const fn = httpsCallable<TruckQuoteRequest, TruckFareQuote>(functions, "quoteTruckFare");
+  const result = await fn(req);
+  return result.data;
+}
+export interface BusFareQuote extends FareQuote {
+  vehicleType: "bus";
+  seats: number;
+  ratePerKmSeat: number;
+  eachWayKm: number;
+  billableKm: number;
+  roundTrip: true;
+  minimumApplied: boolean;
+}
+
+/** Standalone bus charter quote. Priced as a round trip: each-way distance x 2. */
+export async function quoteBusFare(req: {
+  pickup: { lat: number; lng: number };
+  destination: { lat: number; lng: number };
+  routeDistanceKm?: number;
+  routeDurationMin?: number;
+}): Promise<BusFareQuote> {
+  const fn = httpsCallable<typeof req, BusFareQuote>(functions, "quoteBusFare");
   const result = await fn(req);
   return result.data;
 }

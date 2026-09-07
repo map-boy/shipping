@@ -53,6 +53,25 @@ cold-chain capable.
 Five vehicle classes: standard car, small car hire, bus, truck, VIP car. Trucks
 carry goods only; VIP cars carry passengers only; the rest carry both.
 
+Bus and truck are priced by their own tariffs and ignore the table below.
+
+### Bus charter
+
+A bus is hired as a whole vehicle for a **round trip**, so the billed distance is
+always each-way x 2.
+
+| Round trip | Price |
+| --- | --- |
+| up to 100 km (50 km each way) | flat 200,000 RWF minimum |
+| beyond that | 90 RWF x 29 seats x round-trip km |
+
+Kigali - Kayonza, 85 km each way: `90 x 29 x 170 = 443,700 RWF`.
+
+Service class, temperature and surge do not apply - it is a quoted charter, not
+metered work. Crossing the 50 km each-way threshold steps the price from 200,000
+to about 261,500, because the rate applies to the whole distance rather than only
+the excess.
+
 ```
 fare = (vehicleBase + km × vehiclePerKm)
        × serviceClassMultiplier

@@ -26,6 +26,29 @@ export const VEHICLES: Record<VehicleType, VehicleSpec> = {
 };
 
 // ---------------------------------------------------------------------------
+// Bus charter (own pricing model, not part of the generic base+perKm fare)
+// ---------------------------------------------------------------------------
+
+/**
+ * A bus is chartered as a whole vehicle for the round trip: it drives out and
+ * comes back, so the billed distance is always each-way x 2.
+ *
+ *   up to 50 km each way (100 km round trip):  flat 200,000 RWF
+ *   beyond that:  90 RWF x 29 seats x round-trip km
+ *
+ * Worked example, Kigali - Kayonza at 85 km each way:
+ *   170 round-trip km x 29 x 90 = 443,700 RWF
+ */
+export const BUS_SEATS = 29;
+
+export const BUS_RATE_PER_KM_SEAT = 90;
+
+export const BUS_MINIMUM_RWF = 200_000;
+
+/** The minimum covers anything up to this each-way distance. */
+export const BUS_MINIMUM_EACH_WAY_KM = 50;
+
+// ---------------------------------------------------------------------------
 // Truck freight (own pricing model, not part of the generic base+perKm fare)
 // ---------------------------------------------------------------------------
 
