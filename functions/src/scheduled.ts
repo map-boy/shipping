@@ -67,7 +67,7 @@ export async function sweepDispatch(now = Date.now()): Promise<SweepResult> {
 }
 
 export const dispatchSweep = onSchedule(
-  { schedule: "every 2 minutes", timeoutSeconds: 120, retryCount: 1 },
+  { schedule: "every 2 minutes", timeoutSeconds: 120, retryCount: 1, maxInstances: 1 },
   async () => {
     const result = await sweepDispatch();
     if (result.expired || result.advanced || result.released) {
@@ -77,7 +77,7 @@ export const dispatchSweep = onSchedule(
 );
 
 /** Retires driver offers that lapsed without the trip itself moving on. */
-export const offerCleanup = onSchedule({ schedule: "every 10 minutes" }, async () => {
+export const offerCleanup = onSchedule({ schedule: "every 10 minutes", maxInstances: 1 }, async () => {
   const now = Date.now();
   const snap = await db.ref("driverOffers").get();
   const byDriver = (snap.val() || {}) as Record<string, Record<string, { expiresAt?: number }>>;

@@ -91,6 +91,7 @@ export interface CreateTripInput {
   goodsDescription?: string;
   truckPackage?: TruckPackage;
   tonnes?: number;
+  tours?: number;
   contactName?: string;
   contactPhone?: string;
   routeDistanceKm?: number;

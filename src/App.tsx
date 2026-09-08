@@ -1,5 +1,5 @@
 import { useState, useEffect, Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { auth } from "./firebase";
 import Navbar from "./components/Navbar";
@@ -14,7 +14,6 @@ const DriverPage = lazy(() => import("./components/DriverPage"));
 const Profile = lazy(() => import("./components/Profile"));
 const ServicePage = lazy(() => import("./components/ServicePage"));
 const CartPage = lazy(() => import("./components/CartPage"));
-const TruckBookingForm = lazy(() => import("./components/TruckBookingForm"));
 const DriverSimulator = lazy(() => import("./components/DriverSimulator"));
 const BookOrder = lazy(() => import("./components/BookOrder"));
 
@@ -52,7 +51,7 @@ export default function App() {
                 <Route path="/profile" element={<Profile user={user} onLogoutClick={() => signOut(auth)} />} />
                 <Route path="/services/:slug" element={<ServicePage />} />
                 <Route path="/cart" element={<CartPage />} />
-                <Route path="/truck" element={<TruckBookingForm />} />
+                <Route path="/truck" element={<Navigate to="/book?vehicle=truck" replace />} />
                 <Route path="/book" element={<BookOrder />} />
                 <Route path="/driver/simulate" element={<DriverSimulator />} />
               </Routes>

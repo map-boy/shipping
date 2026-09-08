@@ -2,7 +2,8 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import {
   VEHICLES, SERVICE_CLASS_SPECS, HANDLING_SPECS,
   parseVehicleType, parseServiceClass, parseHandling, assertServiceable, promisedWindow,
-  parseTruckPackage, parseTonnes, TRUCK_LOOSE_TONNES, TRUCK_PACKAGED_BASE_RWF, TRUCK_RATE_PER_KM_TONNE,
+  parseTruckPackage, parseTonnes, parseTours, TRUCK_PACKAGED_BASE_RWF, TRUCK_RATE_PER_KM_TONNE,
+  TRUCK_DEFAULT_TOURS,
   BUS_SEATS, BUS_RATE_PER_KM_SEAT, BUS_MINIMUM_RWF, BUS_MINIMUM_EACH_WAY_KM,
   type VehicleType, type ServiceClass, type Handling, type TruckPackage,
 } from "./lib/catalog";
@@ -31,6 +32,8 @@ export interface FareBreakdown {
 
 export interface TruckFareBreakdown extends FareBreakdown {
   truckPackage: TruckPackage;
+  /** Truckloads, when billing by tours. 1 for a tonnage load. */
+  tours: number;
   tonnes: number;
 }
 
@@ -161,24 +164,31 @@ export function computeBusFare(options: {
 }
 
 /**
- * Truck freight has its own formula, not the generic base+perKm one:
- *   packaged (billed by weight):  250,000 + (distanceKm x tonnes x 0.25)
- *   loose (non-stackable, whole truck): distanceKm x 30 x 0.25
- * Always immediate (express) and ambient - trucks are not offered a delivery
- * window or temperature choice, so those fields are fixed rather than asked for.
+ * Truck freight, billed one of two ways:
+ *
+ *   tonnes: 250,000 + (0.25 x tonnes x km)
+ *   tours:  0.25 x tours x km
+ *
+ * Always immediate and ambient - trucks are not offered a delivery window or
+ * temperature control.
  */
 export function computeTruckFare(options: {
   distanceKm: number;
   durationMin?: number;
   truckPackage: TruckPackage;
-  tonnes: number;
+  tonnes?: number;
+  tours?: number;
   at?: number;
 }): TruckFareBreakdown {
   const { distanceKm: km, truckPackage } = options;
-  const tonnes = truckPackage === "loose" ? TRUCK_LOOSE_TONNES : options.tonnes;
+  const byTours = truckPackage === "tours";
 
-  const distanceFare = roundFare(km * tonnes * TRUCK_RATE_PER_KM_TONNE);
-  const baseFare = truckPackage === "packaged" ? TRUCK_PACKAGED_BASE_RWF : 0;
+  const tours = byTours ? options.tours ?? TRUCK_DEFAULT_TOURS : 1;
+  const tonnes = byTours ? 0 : options.tonnes ?? 0;
+
+  const units = byTours ? tours : tonnes;
+  const distanceFare = roundFare(km * units * TRUCK_RATE_PER_KM_TONNE);
+  const baseFare = byTours ? 0 : TRUCK_PACKAGED_BASE_RWF;
   const price = roundFare(baseFare + distanceFare);
 
   const durationMin = options.durationMin ?? Math.round((km / FALLBACK_SPEED_KMH) * 60);
@@ -203,6 +213,7 @@ export function computeTruckFare(options: {
     promisedBy,
     truckPackage,
     tonnes,
+    tours,
   };
 }
 
@@ -303,7 +314,9 @@ export const quoteTruckFare = onCall(async (request) => {
   const pickup = requireLatLng(request.data?.pickup, "pickup");
   const destination = requireLatLng(request.data?.destination, "destination");
   const truckPackage = parseTruckPackage(request.data?.truckPackage);
-  const tonnes = truckPackage === "loose" ? TRUCK_LOOSE_TONNES : parseTonnes(request.data?.tonnes);
+  const byTours = truckPackage === "tours";
+  const tonnes = byTours ? undefined : parseTonnes(request.data?.tonnes);
+  const tours = byTours ? parseTours(request.data?.tours) : undefined;
   const routeKm = request.data?.routeDistanceKm;
   const routeMin = request.data?.routeDurationMin;
 
@@ -319,7 +332,7 @@ export const quoteTruckFare = onCall(async (request) => {
   const durationMin =
     typeof routeMin === "number" && Number.isFinite(routeMin) && routeMin > 0 ? routeMin : undefined;
 
-  const fare = computeTruckFare({ distanceKm: km, durationMin, truckPackage, tonnes });
+  const fare = computeTruckFare({ distanceKm: km, durationMin, truckPackage, tonnes, tours });
   return { ...fare, vehicleType: "truck" as const };
 });
 

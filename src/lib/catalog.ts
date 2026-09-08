@@ -10,7 +10,7 @@ export type Handling = "ambient" | "chilled" | "frozen";
 export type TripType = "person" | "goods";
 
 /** "packaged" = billed by weight. "loose" = non-stackable, billed as a full truck. */
-export type TruckPackage = "packaged" | "loose";
+export type TruckPackage = "tonnes" | "tours";
 export const TRUCK_LOOSE_TONNES = 30;
 
 export const VEHICLE_LABELS: Record<VehicleType, string> = {
@@ -67,3 +67,13 @@ export const BUS_SEATS = 29;
 export const BUS_RATE_PER_KM_SEAT = 90;
 export const BUS_MINIMUM_RWF = 200_000;
 export const BUS_MINIMUM_EACH_WAY_KM = 50;
+
+/**
+ * Truck tariff, mirrored for display only. The server is the sole authority on
+ * what is charged.
+ *
+ *   tonnes: 250,000 + (0.25 x tonnes x km)
+ *   tours:  0.25 x tours x km
+ */
+export const TRUCK_TONNES_BASE_RWF = 250_000;
+export const TRUCK_RATE = 0.25;

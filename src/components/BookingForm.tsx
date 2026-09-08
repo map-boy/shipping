@@ -9,6 +9,7 @@ import { quoteFare, type FareQuote, type MarketSnapshot } from "../lib/pricing";
 import type { GeocodeResult } from "../lib/geocode";
 import { useToast } from "../context/toast";
 import { useCart } from "../context/cart";
+import { describeCallableError } from "../lib/callableError";
 
 interface Props {
   userLocation: [number, number] | null;
@@ -78,7 +79,7 @@ export default function BookingForm({
       });
       setQuoteState({ quotes: result.quotes, market: result.market, loading: false, error: null });
     } catch (err) {
-      const message = err instanceof Error && err.message ? err.message : "Could not get a price right now.";
+      const message = describeCallableError(err, "get a price").message;
       setQuoteState({ quotes: [], market: null, loading: false, error: message });
     }
   }, [userLocation, destination, tripType, serviceClass, handling, routeDistanceKm, routeDurationMin]);

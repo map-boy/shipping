@@ -57,27 +57,57 @@ export const BUS_MINIMUM_EACH_WAY_KM = 50;
  * "loose" = non-stackable cargo that takes the whole truck bed regardless of
  * weight (furniture, household items...), so it is billed as a full 30t load.
  */
-export type TruckPackage = "packaged" | "loose";
+/**
+ * How a truck load is billed.
+ *
+ *   tonnes: 250,000 + (0.25 x tonnes x km)
+ *   tours:  0.25 x tours x km
+ *
+ * "packaged" and "loose" are the previous names for the same two modes and are
+ * still accepted, so trips already in the database keep working.
+ */
+export type TruckPackage = "tonnes" | "tours";
 
-export const TRUCK_PACKAGES: TruckPackage[] = ["packaged", "loose"];
+export const TRUCK_PACKAGES: TruckPackage[] = ["tonnes", "tours"];
 
-/** Truck bed capacity used to price "loose" (non-stackable) cargo. */
-export const TRUCK_LOOSE_TONNES = 30;
+const LEGACY_TRUCK_PACKAGES: Record<string, TruckPackage> = {
+  packaged: "tonnes",
+  loose: "tours",
+};
 
-/** Floor charge for packaged freight; the per-tonne-km rate is added on top. */
+/** Floor charge on a tonnage load; the per-km rate is added on top of it. */
 export const TRUCK_PACKAGED_BASE_RWF = 250_000;
 
-/** Rate applied to (distanceKm x tonnes) for both truck package types. */
+/** Rate applied to (km x tonnes) and to (km x tours). */
 export const TRUCK_RATE_PER_KM_TONNE = 0.25;
 
+/** Retained for older records that stored a whole-truck load as 30 t. */
+export const TRUCK_LOOSE_TONNES = 30;
+
+/** Most loads are a single trip out and back. */
+export const TRUCK_DEFAULT_TOURS = 1;
+
 export function parseTruckPackage(value: unknown): TruckPackage {
-  if (typeof value !== "string" || !TRUCK_PACKAGES.includes(value as TruckPackage)) {
-    throw new HttpsError("invalid-argument", `truckPackage must be one of: ${TRUCK_PACKAGES.join(", ")}.`);
+  if (typeof value === "string") {
+    if (TRUCK_PACKAGES.includes(value as TruckPackage)) return value as TruckPackage;
+    const legacy = LEGACY_TRUCK_PACKAGES[value];
+    if (legacy) return legacy;
   }
-  return value as TruckPackage;
+  throw new HttpsError(
+    "invalid-argument",
+    `truckPackage must be one of: ${TRUCK_PACKAGES.join(", ")}.`
+  );
 }
 
-/** Packaged freight is billed by declared weight; loose freight ignores this. */
+/** Number of truckloads for a load billed by tours. */
+export function parseTours(value: unknown): number {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n) || n < 1 || n > 100 || !Number.isInteger(n)) {
+    throw new HttpsError("invalid-argument", "Number of tours must be a whole number from 1 to 100.");
+  }
+  return n;
+}
+
 export function parseTonnes(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n) || n <= 0 || n > TRUCK_LOOSE_TONNES) {
