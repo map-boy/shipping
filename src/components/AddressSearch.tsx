@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { findPlaces, type GeocodeResult } from "../lib/geocode";
+import { searchLocalPlaces, popularPlaces, type RwandaPlace } from "../lib/rwandaPlaces";
 
 interface Props {
   placeholder: string;
@@ -53,8 +54,26 @@ export default function AddressSearch({ placeholder, onSelect, autoFocus }: Prop
     };
   }, [query, run]);
 
-  // An empty box shows nothing without having to clear state from inside an effect.
-  const visibleResults = query.trim() ? results : [];
+  /**
+   * Recommendations come from the built-in gazetteer first. They are computed
+   * synchronously from the bundle, so they appear on the first keystroke and
+   * keep working with no network and no Google. Google's own results are merged
+   * in behind them when they arrive.
+   */
+  const local: RwandaPlace[] = query.trim() ? searchLocalPlaces(query, 6) : popularPlaces(6);
+
+  const localAsResults: GeocodeResult[] = local.map((p) => ({
+    name: `${p.name}${p.region && !p.name.includes(p.region) ? `, ${p.region}` : ""}`,
+    lat: p.lat,
+    lng: p.lng,
+  }));
+
+  const remote = query.trim() ? results : [];
+  const seen = new Set(localAsResults.map((r) => r.name.toLowerCase()));
+  const visibleResults = [
+    ...localAsResults,
+    ...remote.filter((r) => !seen.has(r.name.toLowerCase())),
+  ].slice(0, 10);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -103,25 +122,35 @@ export default function AddressSearch({ placeholder, onSelect, autoFocus }: Prop
 
       {error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
 
-      {open && !searching && visibleResults.length > 0 && (
+      {open && visibleResults.length > 0 && (
         <ul className="absolute left-0 right-0 z-30 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+          {!query.trim() && (
+            <li className="px-4 pt-2.5 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Popular places
+            </li>
+          )}
           {visibleResults.map((place, i) => (
             <li key={`${place.lat},${place.lng},${i}`}>
               <button
                 type="button"
                 onClick={() => handleSelect(place)}
-                className="w-full text-left px-4 py-3 text-base hover:bg-gray-50 active:bg-gray-100 border-b border-gray-100 last:border-0"
+                className="w-full flex items-center gap-3 text-left px-4 py-3 text-base hover:bg-gray-50 active:bg-gray-100 border-b border-gray-100 last:border-0"
               >
-                {place.name}
+                <svg className="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s7-5.4 7-11a7 7 0 10-14 0c0 5.6 7 11 7 11z" />
+                  <circle cx="12" cy="10" r="2.5" />
+                </svg>
+                <span className="min-w-0 truncate">{place.name}</span>
               </button>
             </li>
           ))}
         </ul>
       )}
 
-      {open && !searching && !error && searched && visibleResults.length === 0 && (
+      {open && !searching && searched && visibleResults.length === 0 && (
         <p className="mt-1.5 text-sm text-gray-500">
-          Nothing found for that name. Try a nearby landmark, or drag the map to the spot.
+          Nothing found for that name. Try a district or a nearby landmark, or drag the map to
+          the spot.
         </p>
       )}
     </div>
