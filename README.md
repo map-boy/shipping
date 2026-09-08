@@ -83,6 +83,17 @@ Nothing about the fare is computed in the browser. `quoteFare` prices every
 eligible vehicle and `createTrip` recomputes with the same function, so the
 displayed price and the charged price cannot drift apart.
 
+## Accounts
+
+Booking needs no login. `ensureUser` signs a customer in **anonymously** on
+their first order, so there is no screen and no password but there is still a
+uid - which trip ownership, the database rules, `activeTrips/{uid}` and live
+tracking all depend on. **Enable the Anonymous provider** in Firebase
+Authentication or booking fails.
+
+Driving is different: `/driver` requires a real account. A guest session has no
+recoverable identity, and a driver carries other people's goods and cash.
+
 ## Book or order
 
 `/book` is the three-step ordering flow:
