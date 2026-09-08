@@ -83,6 +83,25 @@ Nothing about the fare is computed in the browser. `quoteFare` prices every
 eligible vehicle and `createTrip` recomputes with the same function, so the
 displayed price and the charged price cannot drift apart.
 
+## Book or order
+
+`/book` is the three-step ordering flow:
+
+1. **Your details** - full name and phone, plus the vehicle from a dropdown
+   (truck, VIP car, standard car, small car hire, bus).
+2. **Where from, where to** - both points set on the map with the drag-to-pin
+   picker.
+3. **Price** - calculated from those two locations the moment the step opens.
+
+Step 3 carries a notice that the quote covers the drop-off exactly as declared,
+and that going past it is charged separately. The customer has to tick it before
+the order can be placed, and `createTrip` stores `quotedDistanceKm` alongside
+`extraDistanceChargeable` so the agreed distance is on the record.
+
+Contact name and phone are stored on the trip so the driver knows who to call.
+Phone numbers are normalised to Rwandan MSISDN (2507XXXXXXXX) by the server;
+`0781234567`, `781234567` and `+250 781 234 567` are all accepted.
+
 ## Dispatch
 
 Jobs are **not** broadcast. `createTrip` ranks nearby drivers and offers the job

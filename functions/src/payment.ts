@@ -2,7 +2,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import axios from "axios";
 import { randomUUID } from "crypto";
 import { db } from "./lib/db";
-import { requireAuth, requireString } from "./lib/validate";
+import { requireAuth, requireString, normalizeRwandaMsisdn } from "./lib/validate";
 import { tripEventUpdate } from "./lib/events";
 
 const MOMO_ENV = process.env.MOMO_ENV || "sandbox";
@@ -46,21 +46,6 @@ function normalizeMomoStatus(raw: unknown): "pending" | "successful" | "failed" 
   if (value === "successful") return "successful";
   if (value === "pending") return "pending";
   return "failed";
-}
-
-function normalizeRwandaMsisdn(raw: unknown): string {
-  const digits = String(raw ?? "").replace(/[^0-9]/g, "");
-  const msisdn = digits.startsWith("250")
-    ? digits
-    : digits.startsWith("0")
-    ? `250${digits.slice(1)}`
-    : digits.startsWith("7")
-    ? `250${digits}`
-    : digits;
-  if (!/^2507[0-9]{8}$/.test(msisdn)) {
-    throw new HttpsError("invalid-argument", "Enter a valid Rwandan Mobile Money number, e.g. 0781234567.");
-  }
-  return msisdn;
 }
 
 export const requestMomoPayment = onCall(async (request) => {

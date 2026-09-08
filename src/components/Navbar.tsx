@@ -106,6 +106,9 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
               )}
             </div>
 
+            <Link to="/book" className={`relative pb-1 transition-colors hover:text-white/70 rounded ${focusRing} focus-visible:ring-offset-black ${isActive("/book") ? "text-white after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-white after:rounded-full" : ""}`}>
+              Book or Order
+            </Link>
             <Link to="/ride" className={`relative pb-1 transition-colors hover:text-white/70 rounded ${focusRing} focus-visible:ring-offset-black ${isActive("/ride") ? "text-white after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-white after:rounded-full" : ""}`}>
               Book a Ride
             </Link>
@@ -154,7 +157,7 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
               </button>
             )}
             <Link
-              to="/ride"
+              to="/book"
               className={`bg-white text-ink text-sm font-semibold px-5 py-2.5 rounded-full transition min-h-[44px] flex items-center active:bg-line ${focusRing} focus-visible:ring-offset-black`}
             >
               Book
@@ -186,6 +189,7 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
                   Cart{itemCount > 0 ? ` (${itemCount})` : ""}
                 </Link>
               </li>
+              <li><Link to="/book" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/book") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Book or Order</Link></li>
               <li><Link to="/ride" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/ride") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Book a Ride</Link></li>
               <li><Link to="/truck" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/truck") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Book a Truck</Link></li>
               <li><Link to="/driver" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/driver") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Drive with TikTak</Link></li>
