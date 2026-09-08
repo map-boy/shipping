@@ -43,6 +43,9 @@ export interface TripRequest {
   paymentStatus?: PaymentStatus;
   paymentReferenceId?: string;
   paymentAmount?: number;
+  contactName?: string;
+  quotedDistanceKm?: number;
+  extraDistanceChargeable?: boolean;
   deliveryCode?: string;
   deliveryConfirmedAt?: number;
   recipientName?: string | null;
@@ -88,6 +91,7 @@ export interface CreateTripInput {
   goodsDescription?: string;
   truckPackage?: TruckPackage;
   tonnes?: number;
+  contactName?: string;
   contactPhone?: string;
   routeDistanceKm?: number;
   routeDurationMin?: number;

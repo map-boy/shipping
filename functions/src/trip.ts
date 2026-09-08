@@ -1,6 +1,8 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "./lib/db";
-import { requireAuth, requireString, requireLatLng } from "./lib/validate";
+import {
+  requireAuth, requireString, requireLatLng, normalizeRwandaMsisdn, requirePersonName,
+} from "./lib/validate";
 import { areaKey, distanceKm, geohash } from "./lib/geo";
 import {
   parseVehicleType, parseServiceClass, parseHandling, assertServiceable,
@@ -66,12 +68,21 @@ export const createTrip = onCall(async (request) => {
 
   let truckPackage: "packaged" | "loose" | undefined;
   let tonnes: number | undefined;
-  let contactPhone: string | undefined;
   if (isTruck) {
     truckPackage = parseTruckPackage(data.truckPackage);
     tonnes = truckPackage === "loose" ? TRUCK_LOOSE_TONNES : parseTonnes(data.tonnes);
-    contactPhone = requireString(data.contactPhone, "contactPhone").slice(0, 20);
   }
+
+  // Whoever the driver should call on arrival. Trucks have always required a
+  // number; the booking wizard supplies both for every vehicle.
+  const contactName =
+    data.contactName === undefined || data.contactName === null
+      ? undefined
+      : requirePersonName(data.contactName, "Contact name");
+  const contactPhone =
+    isTruck || (data.contactPhone !== undefined && data.contactPhone !== null)
+      ? normalizeRwandaMsisdn(data.contactPhone, "phone number")
+      : undefined;
 
   const straightKm = distanceKm(pickup, destination);
   if (straightKm > 500) {
@@ -142,7 +153,12 @@ export const createTrip = onCall(async (request) => {
     ...(deliveryCode ? { deliveryCode } : {}),
     ...(description ? { goodsDescription: description } : {}),
     ...(truckPackage ? { truckPackage, tonnes } : {}),
+    ...(contactName ? { contactName } : {}),
     ...(contactPhone ? { contactPhone } : {}),
+    // The fare covers exactly this distance. Recorded so that going past the
+    // declared drop-off can be charged against what was actually agreed.
+    quotedDistanceKm: fare.distanceKm,
+    extraDistanceChargeable: true,
   };
 
   const updates: Record<string, unknown> = {
