@@ -6,7 +6,7 @@ import { quoteFare, quoteTruckFare, type FareQuote } from "../lib/pricing";
 import { createTripRequest } from "../lib/trips";
 import {
   VEHICLE_LABELS, VEHICLE_CARRIES, formatRwf,
-  TRUCK_TONNES_BASE_RWF, TRUCK_RATE,
+  TRUCK_TONNES_BASE_RWF, TRUCK_RATE, TRUCK_LOOSE_TONNES,
   type TripType, type VehicleType, type TruckPackage,
 } from "../lib/catalog";
 import type { GeocodeResult } from "../lib/geocode";
@@ -321,7 +321,7 @@ export default function BookOrder() {
               </div>
               <p className="text-sm text-muted">
                 {byTours
-                  ? `${TRUCK_RATE} x number of tours x km`
+                  ? `${TRUCK_RATE} x number of tours x km x ${TRUCK_LOOSE_TONNES} (a tour fills the truck)`
                   : `${TRUCK_TONNES_BASE_RWF.toLocaleString()} + (${TRUCK_RATE} x tonnes x km)`}
               </p>
 

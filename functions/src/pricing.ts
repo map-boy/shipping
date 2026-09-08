@@ -3,7 +3,7 @@ import {
   VEHICLES, SERVICE_CLASS_SPECS, HANDLING_SPECS,
   parseVehicleType, parseServiceClass, parseHandling, assertServiceable, promisedWindow,
   parseTruckPackage, parseTonnes, parseTours, TRUCK_PACKAGED_BASE_RWF, TRUCK_RATE_PER_KM_TONNE,
-  TRUCK_DEFAULT_TOURS,
+  TRUCK_DEFAULT_TOURS, TRUCK_LOOSE_TONNES,
   BUS_SEATS, BUS_RATE_PER_KM_SEAT, BUS_MINIMUM_RWF, BUS_MINIMUM_EACH_WAY_KM,
   type VehicleType, type ServiceClass, type Handling, type TruckPackage,
 } from "./lib/catalog";
@@ -167,7 +167,7 @@ export function computeBusFare(options: {
  * Truck freight, billed one of two ways:
  *
  *   tonnes: 250,000 + (0.25 x tonnes x km)
- *   tours:  0.25 x tours x km
+ *   tours:  0.25 x tours x km x 30   (a tour fills the whole truck: TRUCK_LOOSE_TONNES)
  *
  * Always immediate and ambient - trucks are not offered a delivery window or
  * temperature control.
@@ -186,7 +186,7 @@ export function computeTruckFare(options: {
   const tours = byTours ? options.tours ?? TRUCK_DEFAULT_TOURS : 1;
   const tonnes = byTours ? 0 : options.tonnes ?? 0;
 
-  const units = byTours ? tours : tonnes;
+  const units = byTours ? tours * TRUCK_LOOSE_TONNES : tonnes;
   const distanceFare = roundFare(km * units * TRUCK_RATE_PER_KM_TONNE);
   const baseFare = byTours ? 0 : TRUCK_PACKAGED_BASE_RWF;
   const price = roundFare(baseFare + distanceFare);
