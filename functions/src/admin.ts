@@ -1,4 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+
+/** Admin calls are rare, so they reserve almost no CPU. */
+const ADMIN_OPTS = { maxInstances: 1 } as const;
 import { timingSafeEqual } from "crypto";
 import { db } from "./lib/db";
 import { requireString } from "./lib/validate";
@@ -34,32 +37,32 @@ function guard(request: { data?: Record<string, unknown> }) {
   checkAdminCreds(request.data?.username, request.data?.password);
 }
 
-export const adminLogin = onCall(async (request) => {
+export const adminLogin = onCall(ADMIN_OPTS, async (request) => {
   guard(request);
   return { ok: true };
 });
 
-export const adminListTrips = onCall(async (request) => {
+export const adminListTrips = onCall(ADMIN_OPTS, async (request) => {
   guard(request);
   const snap = await db.ref("trips").get();
   const val = snap.val() || {};
   return { trips: Object.entries(val).map(([id, t]) => ({ id, ...(t as object) })) };
 });
 
-export const adminListDrivers = onCall(async (request) => {
+export const adminListDrivers = onCall(ADMIN_OPTS, async (request) => {
   guard(request);
   const snap = await db.ref("drivers").get();
   const val = snap.val() || {};
   return { drivers: Object.entries(val).map(([id, d]) => ({ id, ...(d as object) })) };
 });
 
-export const adminListBans = onCall(async (request) => {
+export const adminListBans = onCall(ADMIN_OPTS, async (request) => {
   guard(request);
   const snap = await db.ref("bannedUsers").get();
   return { bans: snap.val() || {} };
 });
 
-export const adminMarketplace = onCall(async (request) => {
+export const adminMarketplace = onCall(ADMIN_OPTS, async (request) => {
   guard(request);
   const [market, demand, analytics] = await Promise.all([
     db.ref("marketplace").get(),
@@ -73,7 +76,7 @@ export const adminMarketplace = onCall(async (request) => {
   };
 });
 
-export const adminDeleteTrip = onCall(async (request) => {
+export const adminDeleteTrip = onCall(ADMIN_OPTS, async (request) => {
   guard(request);
   const tripId = requireString(request.data?.tripId, "tripId");
   const snap = await db.ref(`trips/${tripId}`).get();
@@ -91,7 +94,7 @@ export const adminDeleteTrip = onCall(async (request) => {
   return { ok: true };
 });
 
-export const adminSetUserBan = onCall(async (request) => {
+export const adminSetUserBan = onCall(ADMIN_OPTS, async (request) => {
   guard(request);
   const userId = requireString(request.data?.userId, "userId");
   const { banned, reason } = request.data ?? {};
@@ -107,7 +110,7 @@ export const adminSetUserBan = onCall(async (request) => {
   return { ok: true };
 });
 
-export const adminSetDriverStatus = onCall(async (request) => {
+export const adminSetDriverStatus = onCall(ADMIN_OPTS, async (request) => {
   guard(request);
   const driverId = requireString(request.data?.driverId, "driverId");
   const status = requireString(request.data?.status, "status");
@@ -119,7 +122,7 @@ export const adminSetDriverStatus = onCall(async (request) => {
 });
 
 /** Manual trigger for the same sweep the scheduler runs every two minutes. */
-export const adminDispatchSweep = onCall(async (request) => {
+export const adminDispatchSweep = onCall(ADMIN_OPTS, async (request) => {
   guard(request);
   return await sweepDispatch();
 });

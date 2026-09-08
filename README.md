@@ -210,6 +210,27 @@ firebase functions:secrets:set MOMO_SUBSCRIPTION_KEY
 The admin callables refuse every request unless `ADMIN_USERNAME` and
 `ADMIN_PASSWORD` are both set — an unconfigured deployment fails closed.
 
+### Cloud Run CPU quota
+
+Concurrency above 1 makes Cloud Run allocate a full vCPU per instance, so a
+deployment reserves roughly `functions x maxInstances` vCPUs. With ~30 functions
+that number gets large quickly, and the deploy fails with **"Quota exceeded for
+total allowable CPU per project per region"** - which aborts unrelated functions
+mid-deploy.
+
+`maxInstances` therefore defaults to 5, with admin and scheduled functions at 1.
+That is 100 concurrent calls per function, well beyond current need. Raise
+`FUNCTIONS_MAX_INSTANCES` only after raising the project's Cloud Run CPU quota.
+
+### Database trigger region
+
+`onTripEvent` is a Realtime Database trigger, and the database has its own
+region independent of where the functions run. Set `RTDB_REGION` in
+`functions/.env` to match, or the deploy fails with "pattern cannot match any
+databases in region ...". The region is in your `databaseURL`
+(`https://<name>.<region>.firebasedatabase.app`); a legacy `firebaseio.com` URL
+means `us-central1`.
+
 ### Region
 
 Functions default to `us-central1`. Set `FUNCTIONS_REGION` to move them closer to

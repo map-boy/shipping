@@ -14,8 +14,22 @@ import { setGlobalOptions } from "firebase-functions/v2/options";
  */
 setGlobalOptions({
   region: process.env.FUNCTIONS_REGION || "us-central1",
-  maxInstances: Number(process.env.FUNCTIONS_MAX_INSTANCES || 40),
-  concurrency: 40,
+
+  /**
+   * Kept deliberately small.
+   *
+   * Concurrency above 1 forces Cloud Run to allocate a full vCPU per instance,
+   * so the CPU a deployment reserves is roughly (functions x maxInstances). At
+   * 40 that was over a thousand vCPUs across this codebase and the deploy died
+   * with "Quota exceeded for total allowable CPU per project per region",
+   * taking acceptTrip, startTrip, cancelTrip and markCashPayment with it.
+   *
+   * 5 instances x 20 concurrent requests is 100 in-flight calls per function,
+   * which is far beyond what this service needs today. Raise it once the
+   * project's Cloud Run CPU quota has been raised to match.
+   */
+  maxInstances: Number(process.env.FUNCTIONS_MAX_INSTANCES || 5),
+  concurrency: 20,
   memory: "256MiB",
   timeoutSeconds: 60,
 });

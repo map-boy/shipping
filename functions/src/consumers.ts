@@ -8,7 +8,25 @@ import type { TripEvent } from "./lib/events";
  * it writes a milestone and returns. Each consumer below fails on its own
  * without blocking the others or the trip.
  */
-export const onTripEvent = onValueCreated("/tripEvents/{tripId}/{eventId}", async (event) => {
+/**
+ * The Realtime Database lives in its own region, which is not necessarily the
+ * region the functions run in. Passing only a path made the trigger look for a
+ * database in us-central1 and the deploy failed with "pattern cannot match any
+ * databases in region us-central1".
+ *
+ * Set RTDB_REGION in functions/.env to the region of your database instance.
+ * Find it in the databaseURL: https://<name>.<region>.firebasedatabase.app, or
+ * run `firebase database:instances:list`. A legacy *.firebaseio.com URL means
+ * us-central1. RTDB_INSTANCE only needs setting for a non-default instance.
+ */
+export const onTripEvent = onValueCreated(
+  {
+    ref: "/tripEvents/{tripId}/{eventId}",
+    region: process.env.RTDB_REGION || "us-central1",
+    ...(process.env.RTDB_INSTANCE ? { instance: process.env.RTDB_INSTANCE } : {}),
+    maxInstances: 3,
+  },
+  async (event) => {
   const tripId = event.params.tripId;
   const value = event.data.val() as TripEvent | null;
   if (!value?.type) return;
@@ -24,7 +42,8 @@ export const onTripEvent = onValueCreated("/tripEvents/{tripId}/{eventId}", asyn
       console.error(`tripEvent consumer ${i} failed for ${tripId}/${value.type}:`, r.reason);
     }
   });
-});
+  }
+);
 
 const NOTIFY_COPY: Partial<Record<TripEvent["type"], string>> = {
   offered: "A new job is waiting for you.",
