@@ -218,18 +218,38 @@ that number gets large quickly, and the deploy fails with **"Quota exceeded for
 total allowable CPU per project per region"** - which aborts unrelated functions
 mid-deploy.
 
-`maxInstances` therefore defaults to 5, with admin and scheduled functions at 1.
-That is 100 concurrent calls per function, well beyond current need. Raise
-`FUNCTIONS_MAX_INSTANCES` only after raising the project's Cloud Run CPU quota.
+The trap is `concurrency`: **any value above 1 forces a full vCPU per
+instance**. Lowering `maxInstances` alone does not help much - 31 functions at 5
+instances is still 155 vCPU.
+
+So the deployment runs `concurrency: 1` with `cpu: "gcf_gen1"`, giving each
+256MiB instance about 0.167 vCPU - exactly how 1st-generation functions ran.
+With `maxInstances: 3` that is roughly 16 vCPU in total, which fits a default
+quota with no quota increase and no billing change.
+
+The cost is one request per instance, so heavy traffic means more cold starts.
+Raise `FUNCTIONS_MAX_INSTANCES` first when real load justifies it; only raise
+`concurrency` after the Cloud Run CPU quota has been raised, since that
+re-triggers the full-vCPU rule.
 
 ### Database trigger region
 
 `onTripEvent` is a Realtime Database trigger, and the database has its own
-region independent of where the functions run. Set `RTDB_REGION` in
-`functions/.env` to match, or the deploy fails with "pattern cannot match any
-databases in region ...". The region is in your `databaseURL`
-(`https://<name>.<region>.firebasedatabase.app`); a legacy `firebaseio.com` URL
-means `us-central1`.
+region independent of where the functions run. A wrong region fails the deploy
+with "pattern cannot match any databases in region ..." and takes unrelated
+functions down with it, so **the trigger is off by default**.
+
+To enable it, put both of these in `functions/.env`:
+
+```
+RTDB_REGION=<your database region>
+ENABLE_TRIP_EVENT_TRIGGER=true
+```
+
+The region is in your `databaseURL` (`https://<name>.<region>.firebasedatabase.app`);
+a legacy `firebaseio.com` URL means `us-central1`. Only notifications, receipts
+and analytics depend on this trigger - booking, dispatch, payment and tracking
+do not.
 
 ### Region
 
