@@ -4,11 +4,11 @@ import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "../firebase";
 import DestinationPicker from "./DestinationPicker";
 import AuthModal from "./AuthModal";
-import { quoteFare, type FareQuote } from "../lib/pricing";
+import { quoteFare, quoteTruckFare, type FareQuote } from "../lib/pricing";
 import { createTripRequest } from "../lib/trips";
 import {
   VEHICLE_LABELS, VEHICLE_CARRIES, formatRwf,
-  type TripType, type VehicleType,
+  type TripType, type VehicleType, type TruckPackage,
 } from "../lib/catalog";
 import type { GeocodeResult } from "../lib/geocode";
 import { fetchRoute } from "../lib/directions";
@@ -45,6 +45,9 @@ export default function BookOrder() {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [vehicleType, setVehicleType] = useState<VehicleType>("truck");
+  // Trucks are priced by load, so they need these before any price exists.
+  const [truckPackage, setTruckPackage] = useState<TruckPackage>("packaged");
+  const [tonnes, setTonnes] = useState("1");
 
   // Step 2
   const [pickup, setPickup] = useState<GeocodeResult | null>(null);
@@ -65,8 +68,19 @@ export default function BookOrder() {
   // deriving "goods" from its "both" capability would have mislabelled it.
   const tripType: TripType = VEHICLE_CARRIES[vehicleType] === "goods" ? "goods" : "person";
 
-  const step1Valid = fullName.trim().length >= 2 && isValidRwandaPhone(phone);
-  const step2Valid = !!pickup && !!dropoff;
+  const isTruck = vehicleType === "truck";
+  const tonnesNum = Number(tonnes);
+  const truckDetailsValid =
+    !isTruck || truckPackage === "loose" || (Number.isFinite(tonnesNum) && tonnesNum > 0 && tonnesNum <= 30);
+  const step1Valid = fullName.trim().length >= 2 && isValidRwandaPhone(phone) && truckDetailsValid;
+  // Both points defaulted to the map centre in testing, which produced a 0 km
+  // trip and a nonsense price. Require them to be genuinely different places.
+  const samePlace =
+    !!pickup &&
+    !!dropoff &&
+    Math.abs(pickup.lat - dropoff.lat) < 0.0005 &&
+    Math.abs(pickup.lng - dropoff.lng) < 0.0005;
+  const step2Valid = !!pickup && !!dropoff && !samePlace;
 
   /**
    * Step 3 prices itself off the two locations. The road distance comes from the
@@ -96,6 +110,31 @@ export default function BookOrder() {
         // No road route: the server falls back to great-circle distance.
       }
 
+      if (vehicleType === "truck") {
+        // quoteFare excludes trucks on purpose: freight is priced by package
+        // type and weight, which the generic per-km quote knows nothing about.
+        const truck = await quoteTruckFare({
+          pickup: { lat: pickup.lat, lng: pickup.lng },
+          destination: { lat: dropoff.lat, lng: dropoff.lng },
+          truckPackage,
+          tonnes: truckPackage === "loose" ? 30 : tonnesNum,
+          routeDistanceKm: routeKm,
+          routeDurationMin: routeMin,
+        });
+        setQuote({
+          ...truck,
+          label: VEHICLE_LABELS.truck,
+          maxLoadKg: 30000,
+          serviceClass: "express",
+          handling: "ambient",
+          subtotal: truck.price,
+          serviceMultiplier: 1,
+          handlingMultiplier: 1,
+          surgeMultiplier: 1,
+        } as FareQuote);
+        return;
+      }
+
       const result = await quoteFare({
         pickup: { lat: pickup.lat, lng: pickup.lng },
         destination: { lat: dropoff.lat, lng: dropoff.lng },
@@ -123,7 +162,7 @@ export default function BookOrder() {
     } finally {
       setQuoting(false);
     }
-  }, [pickup, dropoff, tripType, vehicleType]);
+  }, [pickup, dropoff, tripType, vehicleType, truckPackage, tonnesNum]);
 
   const availableVehicles = useMemo(
     () => VEHICLE_ORDER.filter((v) => VEHICLE_LABELS[v]),
@@ -147,6 +186,9 @@ export default function BookOrder() {
         destination: { lat: dropoff.lat, lng: dropoff.lng },
         contactName: fullName.trim(),
         contactPhone: phone.trim(),
+        ...(isTruck
+          ? { truckPackage, tonnes: truckPackage === "loose" ? 30 : tonnesNum }
+          : {}),
         routeDistanceKm: route?.km,
         routeDurationMin: route?.min,
       });
@@ -251,6 +293,53 @@ export default function BookOrder() {
             </select>
           </label>
 
+          {isTruck && (
+            <div className="space-y-3 rounded-lg bg-surface p-4">
+              <p className="eyebrow">What is being carried</p>
+              <div className="flex gap-2">
+                {(["packaged", "loose"] as TruckPackage[]).map((pkg) => (
+                  <button
+                    key={pkg}
+                    onClick={() => setTruckPackage(pkg)}
+                    className={`flex-1 px-3 py-3 rounded-lg text-sm font-semibold border-2 transition-colors ${
+                      truckPackage === pkg
+                        ? "border-ink bg-white text-ink"
+                        : "border-transparent bg-white/60 text-muted"
+                    }`}
+                  >
+                    {pkg === "packaged" ? "Packaged goods" : "Loose / bulky"}
+                  </button>
+                ))}
+              </div>
+              <p className="text-sm text-muted">
+                {truckPackage === "packaged"
+                  ? "Boxed or crated goods, billed by weight."
+                  : "Furniture and non-stackable loads take the whole bed, billed as a full 30 t load."}
+              </p>
+
+              {truckPackage === "packaged" && (
+                <label className="block">
+                  <span className="eyebrow">Weight in tonnes</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0.1}
+                    max={30}
+                    step={0.1}
+                    value={tonnes}
+                    onChange={(e) => setTonnes(e.target.value)}
+                    className="field bg-white mt-1.5"
+                  />
+                  {!truckDetailsValid && (
+                    <span className="block text-sm text-red-600 mt-1.5">
+                      Enter a weight between 0.1 and 30 tonnes.
+                    </span>
+                  )}
+                </label>
+              )}
+            </div>
+          )}
+
           <button onClick={() => setStep(2)} disabled={!step1Valid} className="btn-primary">
             Continue
           </button>
@@ -286,6 +375,12 @@ export default function BookOrder() {
               </span>
             </span>
           </button>
+
+          {samePlace && (
+            <p className="text-sm text-red-600">
+              Pickup and drop-off are the same place. Set a different drop-off point.
+            </p>
+          )}
 
           <div className="flex gap-3">
             <button onClick={() => setStep(1)} className="btn-secondary flex-1">
