@@ -187,9 +187,9 @@ export function computeTruckFare(options: {
   const tonnes = byTours ? 0 : options.tonnes ?? 0;
 
   const units = byTours ? tours * TRUCK_LOOSE_TONNES : tonnes;
-  const distanceFare = roundFare(km * units * TRUCK_RATE_PER_KM_TONNE);
+  const distanceFare = km * units * TRUCK_RATE_PER_KM_TONNE;
   const baseFare = byTours ? 0 : TRUCK_PACKAGED_BASE_RWF;
-  const price = roundFare(baseFare + distanceFare);
+  const price = baseFare + distanceFare;
 
   const durationMin = options.durationMin ?? Math.round((km / FALLBACK_SPEED_KMH) * 60);
   const at = options.at ?? Date.now();
