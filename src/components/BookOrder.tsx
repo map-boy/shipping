@@ -1,13 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { auth } from "../firebase";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DestinationPicker from "./DestinationPicker";
-import AuthModal from "./AuthModal";
 import { quoteFare, quoteTruckFare, type FareQuote } from "../lib/pricing";
 import { createTripRequest } from "../lib/trips";
 import {
   VEHICLE_LABELS, VEHICLE_CARRIES, formatRwf,
+  TRUCK_TONNES_BASE_RWF, TRUCK_RATE,
   type TripType, type VehicleType, type TruckPackage,
 } from "../lib/catalog";
 import type { GeocodeResult } from "../lib/geocode";
@@ -15,6 +13,7 @@ import { fetchRoute } from "../lib/directions";
 import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { useToast } from "../context/toast";
 import { describeCallableError, backendReachable } from "../lib/callableError";
+import { ensureUser } from "../lib/ensureUser";
 
 type Step = 1 | 2 | 3;
 
@@ -37,18 +36,22 @@ export default function BookOrder() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [user, setUser] = useState<User | null>(auth.currentUser);
-  const [showAuth, setShowAuth] = useState(false);
-
   const [step, setStep] = useState<Step>(1);
 
   // Step 1
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [vehicleType, setVehicleType] = useState<VehicleType>("truck");
+  // A service card on the home page links in with ?vehicle=, so the dropdown
+  // starts on the service the customer actually clicked.
+  const [searchParams] = useSearchParams();
+  const requested = searchParams.get("vehicle") as VehicleType | null;
+  const [vehicleType, setVehicleType] = useState<VehicleType>(
+    requested && requested in VEHICLE_LABELS ? requested : "truck"
+  );
   // Trucks are priced by load, so they need these before any price exists.
-  const [truckPackage, setTruckPackage] = useState<TruckPackage>("packaged");
+  const [truckPackage, setTruckPackage] = useState<TruckPackage>("tonnes");
   const [tonnes, setTonnes] = useState("1");
+  const [tours, setTours] = useState("1");
 
   // Step 2
   const [pickup, setPickup] = useState<GeocodeResult | null>(null);
@@ -65,16 +68,19 @@ export default function BookOrder() {
   const [acceptedExtra, setAcceptedExtra] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => onAuthStateChanged(auth, setUser), []);
-
   // Only the truck is freight-only. A bus is a 29-seat passenger charter, so
   // deriving "goods" from its "both" capability would have mislabelled it.
   const tripType: TripType = VEHICLE_CARRIES[vehicleType] === "goods" ? "goods" : "person";
 
   const isTruck = vehicleType === "truck";
+  const byTours = truckPackage === "tours";
   const tonnesNum = Number(tonnes);
+  const toursNum = Number(tours);
   const truckDetailsValid =
-    !isTruck || truckPackage === "loose" || (Number.isFinite(tonnesNum) && tonnesNum > 0 && tonnesNum <= 30);
+    !isTruck ||
+    (byTours
+      ? Number.isInteger(toursNum) && toursNum >= 1 && toursNum <= 100
+      : Number.isFinite(tonnesNum) && tonnesNum > 0 && tonnesNum <= 30);
   const step1Valid = fullName.trim().length >= 2 && isValidRwandaPhone(phone) && truckDetailsValid;
   // Both points defaulted to the map centre in testing, which produced a 0 km
   // trip and a nonsense price. Require them to be genuinely different places.
@@ -122,7 +128,7 @@ export default function BookOrder() {
           pickup: { lat: pickup.lat, lng: pickup.lng },
           destination: { lat: dropoff.lat, lng: dropoff.lng },
           truckPackage,
-          tonnes: truckPackage === "loose" ? 30 : tonnesNum,
+          ...(byTours ? { tours: toursNum } : { tonnes: tonnesNum }),
           routeDistanceKm: routeKm,
           routeDurationMin: routeMin,
         });
@@ -169,7 +175,7 @@ export default function BookOrder() {
     } finally {
       setQuoting(false);
     }
-  }, [pickup, dropoff, tripType, vehicleType, truckPackage, tonnesNum]);
+  }, [pickup, dropoff, tripType, vehicleType, truckPackage, tonnesNum, toursNum, byTours]);
 
   const availableVehicles = useMemo(
     () => VEHICLE_ORDER.filter((v) => VEHICLE_LABELS[v]),
@@ -178,12 +184,11 @@ export default function BookOrder() {
 
   async function submit() {
     if (!quote || !pickup || !dropoff) return;
-    if (!user) {
-      setShowAuth(true);
-      return;
-    }
     setSubmitting(true);
     try {
+      // No login: a guest identity is created silently so the trip still has an
+      // owner for the security rules and for live tracking.
+      await ensureUser();
       const tripId = await createTripRequest({
         tripType,
         vehicleType,
@@ -193,9 +198,7 @@ export default function BookOrder() {
         destination: { lat: dropoff.lat, lng: dropoff.lng },
         contactName: fullName.trim(),
         contactPhone: phone.trim(),
-        ...(isTruck
-          ? { truckPackage, tonnes: truckPackage === "loose" ? 30 : tonnesNum }
-          : {}),
+        ...(isTruck ? { truckPackage, ...(byTours ? { tours: toursNum } : { tonnes: tonnesNum }) } : {}),
         routeDistanceKm: route?.km,
         routeDurationMin: route?.min,
       });
@@ -299,48 +302,48 @@ export default function BookOrder() {
 
           {isTruck && (
             <div className="space-y-3 rounded-lg bg-surface p-4">
-              <p className="eyebrow">What is being carried</p>
+              <p className="eyebrow">How is the load measured?</p>
               <div className="flex gap-2">
-                {(["packaged", "loose"] as TruckPackage[]).map((pkg) => (
+                {(["tonnes", "tours"] as TruckPackage[]).map((mode) => (
                   <button
-                    key={pkg}
-                    onClick={() => setTruckPackage(pkg)}
+                    key={mode}
+                    onClick={() => setTruckPackage(mode)}
                     className={`flex-1 px-3 py-3 rounded-lg text-sm font-semibold border-2 transition-colors ${
-                      truckPackage === pkg
+                      truckPackage === mode
                         ? "border-ink bg-white text-ink"
                         : "border-transparent bg-white/60 text-muted"
                     }`}
                   >
-                    {pkg === "packaged" ? "Packaged goods" : "Loose / bulky"}
+                    {mode === "tonnes" ? "In tonnes" : "In tours"}
                   </button>
                 ))}
               </div>
               <p className="text-sm text-muted">
-                {truckPackage === "packaged"
-                  ? "Boxed or crated goods, billed by weight."
-                  : "Furniture and non-stackable loads take the whole bed, billed as a full 30 t load."}
+                {byTours
+                  ? `${TRUCK_RATE} x number of tours x km`
+                  : `${TRUCK_TONNES_BASE_RWF.toLocaleString()} + (${TRUCK_RATE} x tonnes x km)`}
               </p>
 
-              {truckPackage === "packaged" && (
-                <label className="block">
-                  <span className="eyebrow">Weight in tonnes</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min={0.1}
-                    max={30}
-                    step={0.1}
-                    value={tonnes}
-                    onChange={(e) => setTonnes(e.target.value)}
-                    className="field bg-white mt-1.5"
-                  />
-                  {!truckDetailsValid && (
-                    <span className="block text-sm text-red-600 mt-1.5">
-                      Enter a weight between 0.1 and 30 tonnes.
-                    </span>
-                  )}
-                </label>
-              )}
+              <label className="block">
+                <span className="eyebrow">{byTours ? "Number of tours" : "Weight in tonnes"}</span>
+                <input
+                  type="number"
+                  inputMode={byTours ? "numeric" : "decimal"}
+                  min={byTours ? 1 : 0.1}
+                  max={byTours ? 100 : 30}
+                  step={byTours ? 1 : 0.1}
+                  value={byTours ? tours : tonnes}
+                  onChange={(e) => (byTours ? setTours(e.target.value) : setTonnes(e.target.value))}
+                  className="field bg-white mt-1.5"
+                />
+                {!truckDetailsValid && (
+                  <span className="block text-sm text-red-600 mt-1.5">
+                    {byTours
+                      ? "Enter a whole number of tours from 1 to 100."
+                      : "Enter a weight between 0.1 and 30 tonnes."}
+                  </span>
+                )}
+              </label>
             </div>
           )}
 
@@ -489,20 +492,17 @@ export default function BookOrder() {
                 disabled={!quote || quoting || !acceptedExtra || submitting}
                 className="btn-primary flex-1"
               >
-                {submitting ? "Placing..." : user ? "Place order" : "Log in to order"}
+                {submitting ? "Placing..." : "Place order"}
               </button>
             )}
           </div>
 
-          {!user && (
-            <p className="text-sm text-muted text-center">
-              You need an account so you and your driver can track the trip.
-            </p>
-          )}
+          <p className="text-sm text-muted text-center">
+            No account needed. Keep this page open to follow your driver on the map.
+          </p>
         </div>
       )}
 
-      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
     </div>
   );
 }

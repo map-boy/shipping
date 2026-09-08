@@ -6,7 +6,7 @@ import {
 import { areaKey, distanceKm, geohash } from "./lib/geo";
 import {
   parseVehicleType, parseServiceClass, parseHandling, assertServiceable,
-  parseTruckPackage, parseTonnes, TRUCK_LOOSE_TONNES,
+  parseTruckPackage, parseTonnes, parseTours, type TruckPackage,
 } from "./lib/catalog";
 import { computeFare, computeTruckFare, computeBusFare } from "./pricing";
 import { refreshMarket } from "./marketplace";
@@ -66,11 +66,16 @@ export const createTrip = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "goodsDescription must be a string.");
   }
 
-  let truckPackage: "packaged" | "loose" | undefined;
+  let truckPackage: TruckPackage | undefined;
   let tonnes: number | undefined;
+  let tours: number | undefined;
   if (isTruck) {
     truckPackage = parseTruckPackage(data.truckPackage);
-    tonnes = truckPackage === "loose" ? TRUCK_LOOSE_TONNES : parseTonnes(data.tonnes);
+    if (truckPackage === "tours") {
+      tours = parseTours(data.tours);
+    } else {
+      tonnes = parseTonnes(data.tonnes);
+    }
   }
 
   // Whoever the driver should call on arrival. Trucks have always required a
@@ -110,7 +115,7 @@ export const createTrip = onCall(async (request) => {
   }
 
   const fare = isTruck
-    ? computeTruckFare({ distanceKm: km, durationMin, truckPackage: truckPackage!, tonnes: tonnes! })
+    ? computeTruckFare({ distanceKm: km, durationMin, truckPackage: truckPackage!, tonnes, tours })
     : isBus
     ? computeBusFare({ distanceKm: km, durationMin })
     : computeFare({ distanceKm: km, durationMin, vehicleType, serviceClass, handling, surgeMultiplier });
@@ -152,7 +157,9 @@ export const createTrip = onCall(async (request) => {
     expiresAt: createdAt + REQUEST_TTL_MS,
     ...(deliveryCode ? { deliveryCode } : {}),
     ...(description ? { goodsDescription: description } : {}),
-    ...(truckPackage ? { truckPackage, tonnes } : {}),
+    ...(truckPackage
+      ? { truckPackage, ...(tonnes !== undefined ? { tonnes } : {}), ...(tours !== undefined ? { tours } : {}) }
+      : {}),
     ...(contactName ? { contactName } : {}),
     ...(contactPhone ? { contactPhone } : {}),
     // The fare covers exactly this distance. Recorded so that going past the

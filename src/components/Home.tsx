@@ -1,4 +1,5 @@
 import Hero from "./Hero";
+import ServiceOffers from "./ServiceOffers";
 import TrustProps from "./TrustProps";
 import HowItWorks from "./HowItWorks";
 import About from "./About";
@@ -15,6 +16,7 @@ export default function Home() {
     <>
       <Hero />
       <TrustProps />
+      <ServiceOffers />
       <HowItWorks />
       <About />
       <PopularServices />

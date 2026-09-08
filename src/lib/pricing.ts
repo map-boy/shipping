@@ -68,6 +68,7 @@ export interface TruckFareQuote {
   durationMin: number;
   truckPackage: TruckPackage;
   tonnes: number;
+  tours: number;
   baseFare: number;
   distanceFare: number;
   price: number;
@@ -80,7 +81,8 @@ export interface TruckQuoteRequest {
   pickup: { lat: number; lng: number };
   destination: { lat: number; lng: number };
   truckPackage: TruckPackage;
-  tonnes: number;
+  tonnes?: number;
+  tours?: number;
   routeDistanceKm?: number;
   routeDurationMin?: number;
 }
