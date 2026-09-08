@@ -37,6 +37,9 @@ export default function DestinationPicker({
   const [center, setCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** True once the Maps script has failed; the picker then works without it. */
+  const [mapFailed, setMapFailed] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   const resolveAddress = useCallback((lat: number, lng: number) => {
     const seq = ++requestSeq.current;
@@ -88,7 +91,16 @@ export default function DestinationPicker({
           idleTimer.current = setTimeout(() => resolveAddress(next.lat, next.lng), 250);
         });
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load the map."));
+      .catch((err) => {
+        // Without this the pin never gets a position, so Confirm stayed disabled
+        // forever and the whole flow dead-ended on a blank grey panel.
+        setMapFailed(true);
+        setError(
+          err instanceof Error && err.message
+            ? `Map could not load: ${err.message}`
+            : "Map could not load."
+        );
+      });
 
     return () => {
       cancelled = true;
@@ -96,20 +108,45 @@ export default function DestinationPicker({
     };
   }, [initialCenter, resolveAddress]);
 
+  /**
+   * Uses the device's own GPS. This does not need Google Maps, so it is the one
+   * way to choose a point when the Maps script is unavailable.
+   */
   function recenterToMe() {
-    if (!navigator.geolocation || !mapRef.current) return;
+    if (!navigator.geolocation) {
+      setError("This browser cannot report your location.");
+      return;
+    }
+    setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => mapRef.current?.panTo({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      (err) => setError(err.message),
-      { enableHighAccuracy: true, timeout: 10000 }
+      (pos) => {
+        setLocating(false);
+        const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        if (mapRef.current) {
+          mapRef.current.panTo(here);
+        } else {
+          // No map to pan, so adopt the fix directly as the chosen point.
+          setCenter(here);
+          setAddress(`${here.lat.toFixed(5)}, ${here.lng.toFixed(5)}`);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        setError(err.message);
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
     );
   }
 
   function handleSearchSelect(place: GeocodeResult) {
     setSearchOpen(false);
-    mapRef.current?.panTo({ lat: place.lat, lng: place.lng });
-    mapRef.current?.setZoom(17);
     setAddress(place.name);
+    // A searched place is itself a valid answer, whether or not a map is drawn.
+    setCenter({ lat: place.lat, lng: place.lng });
+    if (mapRef.current) {
+      mapRef.current.panTo({ lat: place.lat, lng: place.lng });
+      mapRef.current.setZoom(17);
+    }
   }
 
   function confirm() {
@@ -122,8 +159,25 @@ export default function DestinationPicker({
       <div className="relative flex-1">
         <div ref={container} className="absolute inset-0" />
 
+        {mapFailed && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center bg-surface">
+            <p className="text-base font-semibold">The map could not load</p>
+            <p className="text-sm text-muted">
+              You can still set this point by searching for it below, or by using your current
+              location.
+            </p>
+            <button onClick={recenterToMe} disabled={locating} className="btn-primary max-w-xs">
+              {locating ? "Locating..." : "Use my current location"}
+            </button>
+          </div>
+        )}
+
         {/* The pin never moves. The map does. */}
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div
+          className={`pointer-events-none absolute inset-0 flex items-center justify-center ${
+            mapFailed ? "hidden" : ""
+          }`}
+        >
           <div
             className={`flex flex-col items-center transition-transform duration-200 ${
               moving ? "-translate-y-2" : "translate-y-0"
@@ -155,7 +209,9 @@ export default function DestinationPicker({
         <button
           onClick={recenterToMe}
           aria-label="Centre on my location"
-          className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center active:bg-gray-100"
+          className={`absolute bottom-4 right-4 w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center active:bg-gray-100 ${
+            mapFailed ? "hidden" : ""
+          }`}
         >
           <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none" />
@@ -178,12 +234,14 @@ export default function DestinationPicker({
 
         <div className="px-5 pt-2 pb-4 text-center border-b border-gray-100">
           <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
-          <p className="text-gray-500 mt-0.5">Drag map to move pin</p>
+          <p className="text-gray-500 mt-0.5">
+            {mapFailed ? "Search for the place, or use your location" : "Drag map to move pin"}
+          </p>
         </div>
 
         <div className="px-5 pt-4 pb-5 space-y-4">
-          {searchOpen ? (
-            <AddressSearch placeholder="Search for an address" onSelect={handleSearchSelect} />
+          {searchOpen || mapFailed ? (
+            <AddressSearch placeholder="Search for an address" onSelect={handleSearchSelect} autoFocus />
           ) : (
             <button
               onClick={() => setSearchOpen(true)}
@@ -200,9 +258,15 @@ export default function DestinationPicker({
             </button>
           )}
 
+          {center && (
+            <p className="text-sm text-muted text-center">
+              Selected: {center.lat.toFixed(5)}, {center.lng.toFixed(5)}
+            </p>
+          )}
+
           <button
             onClick={confirm}
-            disabled={!center || resolving}
+            disabled={!center}
             className="w-full bg-black text-white rounded-lg py-4 text-lg font-semibold disabled:opacity-40 active:bg-gray-800"
           >
             {confirmLabel}

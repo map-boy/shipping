@@ -79,3 +79,55 @@ export async function searchPlaces(query: string): Promise<GeocodeResult[]> {
 
   return details.filter((d): d is GeocodeResult => d !== null);
 }
+/**
+ * Looks a typed address up with the Geocoder rather than Places.
+ *
+ * Places Autocomplete is not enabled on every API key - Google stopped offering
+ * the legacy Places classes to new projects - so a key that renders maps fine can
+ * still return no suggestions. Geocoding is the more widely enabled service, and
+ * it also lets someone confirm a place they typed but never saw suggested.
+ */
+export async function geocodeAddress(query: string): Promise<GeocodeResult[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+
+  const google = await loadGoogleMaps();
+  const geocoder = new google.maps.Geocoder();
+
+  return new Promise((resolve) => {
+    geocoder.geocode(
+      {
+        address: trimmed,
+        componentRestrictions: { country: "RW" },
+        bounds: new google.maps.LatLngBounds(
+          { lat: KIGALI_CENTER.lat - 2.5, lng: KIGALI_CENTER.lng - 2.5 },
+          { lat: KIGALI_CENTER.lat + 2.5, lng: KIGALI_CENTER.lng + 2.5 }
+        ),
+      },
+      (results, status) => {
+        if (status !== google.maps.GeocoderStatus.OK || !results) {
+          resolve([]);
+          return;
+        }
+        resolve(
+          results.slice(0, 6).map((r) => ({
+            name: r.formatted_address,
+            lat: r.geometry.location.lat(),
+            lng: r.geometry.location.lng(),
+          }))
+        );
+      }
+    );
+  });
+}
+
+/** Places first, Geocoder as a fallback, so a typed name always has a chance. */
+export async function findPlaces(query: string): Promise<GeocodeResult[]> {
+  try {
+    const viaPlaces = await searchPlaces(query);
+    if (viaPlaces.length > 0) return viaPlaces;
+  } catch {
+    // Places unavailable on this key - fall through to the geocoder.
+  }
+  return await geocodeAddress(query);
+}
