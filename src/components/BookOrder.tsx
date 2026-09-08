@@ -14,6 +14,7 @@ import type { GeocodeResult } from "../lib/geocode";
 import { fetchRoute } from "../lib/directions";
 import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { useToast } from "../context/toast";
+import { describeCallableError, backendReachable } from "../lib/callableError";
 
 type Step = 1 | 2 | 3;
 
@@ -59,6 +60,8 @@ export default function BookOrder() {
   const [route, setRoute] = useState<{ km: number; min: number } | null>(null);
   const [quoting, setQuoting] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [quoteErrorCode, setQuoteErrorCode] = useState<string | null>(null);
+  const [backendDown, setBackendDown] = useState(false);
   const [acceptedExtra, setAcceptedExtra] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -91,6 +94,8 @@ export default function BookOrder() {
     if (!pickup || !dropoff) return;
     setQuoting(true);
     setQuoteError(null);
+    setQuoteErrorCode(null);
+    setBackendDown(false);
     try {
       let routeKm: number | undefined;
       let routeMin: number | undefined;
@@ -154,11 +159,13 @@ export default function BookOrder() {
       setQuote(match);
     } catch (err) {
       setQuote(null);
-      setQuoteError(
-        err instanceof Error && err.message
-          ? err.message
-          : "Could not calculate a price. Check your connection and try again."
-      );
+      const failure = describeCallableError(err, "calculate a price");
+      setQuoteError(failure.message);
+      setQuoteErrorCode(failure.code);
+      // Distinguish "this quote failed" from "nothing is answering at all".
+      if (failure.looksUndeployed) {
+        setBackendDown(!(await backendReachable()));
+      }
     } finally {
       setQuoting(false);
     }
@@ -195,10 +202,7 @@ export default function BookOrder() {
       showToast("Order placed. Finding a driver...", "success");
       navigate("/ride", { state: { tripId } });
     } catch (err) {
-      showToast(
-        err instanceof Error && err.message ? err.message : "Could not place the order.",
-        "error"
-      );
+      showToast(describeCallableError(err, "place the order").message, "error");
     } finally {
       setSubmitting(false);
     }
@@ -416,7 +420,20 @@ export default function BookOrder() {
           </div>
 
           {quoting && <p className="text-muted">Calculating from the map...</p>}
-          {quoteError && <p className="text-red-600 text-sm">{quoteError}</p>}
+          {quoteError && (
+            <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4 space-y-2">
+              <p className="text-sm font-semibold text-red-700">{quoteError}</p>
+              {backendDown && (
+                <p className="text-sm text-red-700">
+                  The booking backend is not reachable at all, so this is not a problem with
+                  your details. Deploy the Cloud Functions and try again.
+                </p>
+              )}
+              {quoteErrorCode && (
+                <p className="text-xs text-red-600 font-mono">error code: {quoteErrorCode}</p>
+              )}
+            </div>
+          )}
 
           {quote && !quoting && (
             <>
