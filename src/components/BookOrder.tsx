@@ -61,7 +61,9 @@ export default function BookOrder() {
 
   useEffect(() => onAuthStateChanged(auth, setUser), []);
 
-  const tripType: TripType = VEHICLE_CARRIES[vehicleType] === "people" ? "person" : "goods";
+  // Only the truck is freight-only. A bus is a 29-seat passenger charter, so
+  // deriving "goods" from its "both" capability would have mislabelled it.
+  const tripType: TripType = VEHICLE_CARRIES[vehicleType] === "goods" ? "goods" : "person";
 
   const step1Valid = fullName.trim().length >= 2 && isValidRwandaPhone(phone);
   const step2Valid = !!pickup && !!dropoff;
