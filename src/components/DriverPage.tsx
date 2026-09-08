@@ -228,7 +228,25 @@ export default function DriverPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-2">Driver dashboard</h1>
-        <p className="text-gray-600">Please log in first to go online and receive job offers.</p>
+        <p className="text-muted">Please log in first to go online and receive job offers.</p>
+      </div>
+    );
+  }
+
+  // Riders book as guests, but a driver carries other people's goods and money.
+  // A guest session has no email, no recoverable identity and no accountability,
+  // so driving requires a real account even though booking does not.
+  if (user.isAnonymous) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-bold mb-2">Driver dashboard</h1>
+        <p className="text-muted">
+          You are signed in as a guest. Driving requires a real account, so riders and the
+          office can identify who is carrying their goods.
+        </p>
+        <p className="text-muted mt-3">
+          Create an account from the Log in button, then come back here.
+        </p>
       </div>
     );
   }

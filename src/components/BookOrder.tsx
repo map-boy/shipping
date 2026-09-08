@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DestinationPicker from "./DestinationPicker";
+import RoutePreviewMap from "./RoutePreviewMap";
 import { quoteFare, quoteTruckFare, type FareQuote } from "../lib/pricing";
 import { createTripRequest } from "../lib/trips";
 import {
   VEHICLE_LABELS, VEHICLE_CARRIES, formatRwf,
-  TRUCK_TONNES_BASE_RWF, TRUCK_RATE,
+  TRUCK_TONNES_BASE_RWF, TRUCK_RATE, TRUCK_LOOSE_TONNES,
   type TripType, type VehicleType, type TruckPackage,
 } from "../lib/catalog";
 import type { GeocodeResult } from "../lib/geocode";
@@ -320,7 +321,7 @@ export default function BookOrder() {
               </div>
               <p className="text-sm text-muted">
                 {byTours
-                  ? `${TRUCK_RATE} x number of tours x km`
+                  ? `${TRUCK_RATE} x number of tours x km x ${TRUCK_LOOSE_TONNES} (a tour fills the truck)`
                   : `${TRUCK_TONNES_BASE_RWF.toLocaleString()} + (${TRUCK_RATE} x tonnes x km)`}
               </p>
 
@@ -383,6 +384,17 @@ export default function BookOrder() {
             </span>
           </button>
 
+          {pickup && dropoff && !samePlace && (
+            <div>
+              <p className="eyebrow mb-2">Check the route</p>
+              <RoutePreviewMap
+                pickup={pickup}
+                dropoff={dropoff}
+                onRoute={(r) => setRoute(r)}
+              />
+            </div>
+          )}
+
           {samePlace && (
             <p className="text-sm text-red-600">
               Pickup and drop-off are the same place. Set a different drop-off point.
@@ -411,16 +423,9 @@ export default function BookOrder() {
         <div className="space-y-5">
           <p className="eyebrow">Your price</p>
 
-          <div className="rounded-lg bg-surface p-4 space-y-2">
-            <div className="flex items-start gap-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-ink shrink-0 mt-1.5" />
-              <span className="text-sm min-w-0 truncate">{pickup?.name}</span>
-            </div>
-            <div className="flex items-start gap-3">
-              <span className="w-2.5 h-2.5 rounded-[2px] bg-ink shrink-0 mt-1.5" />
-              <span className="text-sm min-w-0 truncate">{dropoff?.name}</span>
-            </div>
-          </div>
+          {pickup && dropoff && (
+            <RoutePreviewMap pickup={pickup} dropoff={dropoff} onRoute={(r) => setRoute(r)} />
+          )}
 
           {quoting && <p className="text-muted">Calculating from the map...</p>}
           {quoteError && (

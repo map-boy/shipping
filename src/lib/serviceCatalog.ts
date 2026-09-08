@@ -26,7 +26,7 @@ export const SERVICE_OFFERS: ServiceOffer[] = [
     vehicle: "truck",
     summary:
       "Move goods by truck anywhere in Rwanda, billed either by the weight you are sending or by the number of truckloads.",
-    pricing: "By tonnes: 250,000 RWF + (0.25 x tonnes x km). By tours: 0.25 x tours x km.",
+    pricing: "By tonnes: 250,000 RWF + (0.25 x tonnes x km). By tours: 0.25 x tours x km x 30 (a tour fills the truck).",
     detail: [
       "Choose tonnes for boxed or crated goods you can weigh",
       "Choose tours when you are hiring whole truckloads",
