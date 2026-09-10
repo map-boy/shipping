@@ -120,6 +120,21 @@ export const createTrip = onCall(async (request) => {
     ? computeBusFare({ distanceKm: km, durationMin })
     : computeFare({ distanceKm: km, durationMin, vehicleType, serviceClass, handling, surgeMultiplier });
 
+  // Which tariff produced this price, recorded on the order so a later dispute
+  // does not have to be reverse-engineered from the numbers.
+  const pricingMethod = isTruck
+    ? truckPackage === "tours"
+      ? "truck_tours"
+      : "truck_tonnes"
+    : isBus
+    ? "bus_charter"
+    : "metered";
+
+  const placeName = (value: unknown): string | undefined =>
+    typeof value === "string" && value.trim() ? value.trim().slice(0, 200) : undefined;
+  const pickupName = placeName(data.pickupName);
+  const destinationName = placeName(data.destinationName);
+
   const createdAt = Date.now();
   const description =
     typeof data.goodsDescription === "string" ? data.goodsDescription.slice(0, 280) : undefined;
@@ -166,6 +181,9 @@ export const createTrip = onCall(async (request) => {
     // declared drop-off can be charged against what was actually agreed.
     quotedDistanceKm: fare.distanceKm,
     extraDistanceChargeable: true,
+    pricingMethod,
+    ...(pickupName ? { pickupName } : {}),
+    ...(destinationName ? { destinationName } : {}),
   };
 
   const updates: Record<string, unknown> = {

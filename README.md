@@ -55,6 +55,24 @@ carry goods only; VIP cars carry passengers only; the rest carry both.
 
 Bus and truck are priced by their own tariffs and ignore the table below.
 
+### Truck freight
+
+| Billing | Formula |
+| --- | --- |
+| By tonnes | `250,000 + (250 x km x tonnes)` |
+| By tours | `7,500 x km x tours` |
+
+Both are the same underlying rate of **250 RWF per tonne-km** - the tariff writes
+it as `0.25 x 1000` - and a tour is one full 30 t truckload, so
+`0.25 x 30,000 = 7,500` per tour-km. Only tonnage carries the 250,000 floor.
+
+| Case | Price |
+| --- | --- |
+| 101 km, 1 tonne | 275,250 |
+| 101 km, 5 tonnes | 376,250 |
+| 101 km, 1 tour | 757,500 |
+| 101 km, 5 tours | 3,787,500 |
+
 ### Bus charter
 
 A bus is hired as a whole vehicle for a **round trip**, so the billed distance is

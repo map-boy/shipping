@@ -31,8 +31,40 @@ export async function ensureUser(): Promise<User> {
   });
   if (restored) return restored;
 
-  const credential = await signInAnonymously(auth);
-  return credential.user;
+  try {
+    const credential = await signInAnonymously(auth);
+    return credential.user;
+  } catch (err) {
+    throw new GuestSignInError(err);
+  }
+}
+
+/**
+ * Anonymous sign-in fails with auth/admin-restricted-operation when the
+ * Anonymous provider is disabled in Firebase Authentication. That is a console
+ * setting, not something the customer did, so the raw code must never reach
+ * them - but it does need to reach the logs, or the cause is invisible.
+ */
+export class GuestSignInError extends Error {
+  readonly code: string;
+
+  constructor(cause: unknown) {
+    const code =
+      typeof (cause as { code?: unknown } | undefined)?.code === "string"
+        ? ((cause as { code: string }).code)
+        : "auth/unknown";
+
+    super(
+      code === "auth/admin-restricted-operation" || code === "auth/operation-not-allowed"
+        ? "Guest checkout is not switched on for this site yet. Please log in, or contact us to order."
+        : code === "auth/network-request-failed"
+        ? "We could not reach the server. Check your connection and try again."
+        : "We could not start your order. Please try again."
+    );
+    this.name = "GuestSignInError";
+    this.code = code;
+    console.error("[ensureUser] anonymous sign-in failed", { code, cause });
+  }
 }
 
 export function isGuest(user: User | null): boolean {

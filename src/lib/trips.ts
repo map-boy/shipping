@@ -45,6 +45,9 @@ export interface TripRequest {
   paymentAmount?: number;
   contactName?: string;
   quotedDistanceKm?: number;
+  pricingMethod?: "truck_tonnes" | "truck_tours" | "bus_charter" | "metered";
+  pickupName?: string;
+  destinationName?: string;
   extraDistanceChargeable?: boolean;
   deliveryCode?: string;
   deliveryConfirmedAt?: number;
@@ -94,6 +97,8 @@ export interface CreateTripInput {
   tours?: number;
   contactName?: string;
   contactPhone?: string;
+  pickupName?: string;
+  destinationName?: string;
   routeDistanceKm?: number;
   routeDurationMin?: number;
 }

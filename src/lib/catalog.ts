@@ -76,4 +76,7 @@ export const BUS_MINIMUM_EACH_WAY_KM = 50;
  *   tours:  0.25 x tours x km
  */
 export const TRUCK_TONNES_BASE_RWF = 250_000;
-export const TRUCK_RATE = 0.25;
+/** 250 RWF per tonne-km, i.e. the tariff's 0.25 x 1000. */
+export const TRUCK_RATE_PER_TONNE_KM = 250;
+/** A tour is one full truckload: 30 tonnes, so 7,500 RWF per tour-km. */
+export const TRUCK_TONNES_PER_TOUR = 30;
