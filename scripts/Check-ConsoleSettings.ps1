@@ -107,7 +107,12 @@ $token = gcloud auth print-access-token 2>$null
 if (-not $token) {
     Write-Host "$no Could not get an access token. Run: gcloud auth login"
 } else {
-    $headers = @{ Authorization = "Bearer $token" }
+    # x-goog-user-project is required for user credentials: without it Google
+    # bills the call to the gcloud CLI's own project and answers 403.
+    $headers = @{
+        Authorization       = "Bearer $token"
+        "x-goog-user-project" = $ProjectId
+    }
     $uri = "https://identitytoolkit.googleapis.com/admin/v2/projects/$ProjectId/config"
     try {
         $cfg = Invoke-RestMethod -Method GET -Uri $uri -Headers $headers
@@ -123,12 +128,29 @@ if (-not $token) {
     } catch {
         $code = $_.Exception.Response.StatusCode.value__
         Write-Host "$warn Could not read the auth config (HTTP $code)."
+
+        # PowerShell hides the response body, which is where Google explains
+        # itself. Read it directly or we are guessing at the cause.
+        $body = ""
+        try {
+            $stream = $_.Exception.Response.GetResponseStream()
+            $stream.Position = 0
+            $body = (New-Object System.IO.StreamReader($stream)).ReadToEnd()
+        } catch { $body = $_.ErrorDetails.Message }
+        if ($body) { Write-Host "      Google said: $body" }
+
         if ($code -eq 403) {
-            Write-Host "      403 usually means either the Identity Toolkit API is off:"
-            Write-Host "        gcloud services enable identitytoolkit.googleapis.com --project $ProjectId"
-            Write-Host "      or your account lacks the Firebase Authentication Admin role."
+            Write-Host ""
+            Write-Host "      Check whether you hold a role that can change auth config:"
+            Write-Host "        gcloud projects get-iam-policy $ProjectId ``"
+            Write-Host "          --flatten='bindings[].members' ``"
+            Write-Host "          --filter='bindings.members:$account' ``"
+            Write-Host "          --format='value(bindings.role)'"
+            Write-Host "      You need roles/owner or roles/firebaseauth.admin."
+            Write-Host ""
+            Write-Host "      If you do NOT hold one, the CLI cannot do this. Use the console:"
+            Write-Host "        https://console.firebase.google.com/project/$ProjectId/authentication/providers"
         }
-        Write-Host "      $($_.Exception.Message)"
     }
 }
 
@@ -139,7 +161,7 @@ Write-Host ""
 Write-Host "-- Enable Anonymous sign-in --------------------------------------"
 Write-Host @"
   `$t = gcloud auth print-access-token
-  `$h = @{ Authorization = "Bearer `$t" }
+  `$h = @{ Authorization = "Bearer `$t"; "x-goog-user-project" = "$ProjectId" }
   `$b = '{"signIn":{"anonymous":{"enabled":true}}}'
   Invoke-RestMethod -Method PATCH ``
     -Uri "https://identitytoolkit.googleapis.com/admin/v2/projects/$ProjectId/config?updateMask=signIn.anonymous.enabled" ``
