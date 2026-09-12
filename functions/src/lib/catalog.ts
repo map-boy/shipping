@@ -78,10 +78,9 @@ const LEGACY_TRUCK_PACKAGES: Record<string, TruckPackage> = {
 /** Floor charge on a tonnage load; the per-km rate is added on top of it. */
 export const TRUCK_PACKAGED_BASE_RWF = 250_000;
 
-/** Rate applied to (km x tonnes) and to (km x tours). */
-export const TRUCK_RATE_PER_KM_TONNE = 0.25;
+// Truck pricing lives in lib/truckPricing.ts - see calculateTruckPrice.
 
-/** Retained for older records that stored a whole-truck load as 30 t. */
+/** One tour is one full truckload, billed as 30 tonnes. */
 export const TRUCK_LOOSE_TONNES = 30;
 
 /** Most loads are a single trip out and back. */

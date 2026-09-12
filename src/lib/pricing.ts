@@ -20,6 +20,8 @@ export interface FareQuote {
   currency: "RWF";
   promisedFrom: number;
   promisedBy: number;
+  /** Present only on truck quotes: the arithmetic the server performed. */
+  formula?: string;
   /** Present only on bus quotes, which are whole-vehicle round-trip charters. */
   seats?: number;
   ratePerKmSeat?: number;
@@ -64,6 +66,8 @@ export async function quoteFare(req: QuoteRequest): Promise<{
 
 export interface TruckFareQuote {
   vehicleType: "truck";
+  /** The arithmetic the server performed, shown to the customer verbatim. */
+  formula: string;
   distanceKm: number;
   durationMin: number;
   truckPackage: TruckPackage;

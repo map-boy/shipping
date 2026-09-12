@@ -55,6 +55,30 @@ carry goods only; VIP cars carry passengers only; the rest carry both.
 
 Bus and truck are priced by their own tariffs and ignore the table below.
 
+### Truck freight
+
+```
+by tonnes:  250,000 + (0.25 x distanceKm x 1,000 x tonnes)
+by tours:   0.25 x distanceKm x numberOfTours x 30,000
+```
+
+Both live in one function, `calculateTruckPrice` in
+`functions/src/lib/truckPricing.ts`. Nothing else computes a truck price:
+`quoteTruckFare` and `createTrip` both call it, and the browser never calculates
+at all - it displays the `formula` string the server returns, so the customer
+reads the exact arithmetic that produced their price.
+
+| Case | Price |
+| --- | --- |
+| 101 km, 1 tonne | 275,250 |
+| 101 km, 5 tonnes | 376,250 |
+| 101 km, 1 tour | 757,500 |
+| 101 km, 5 tours | 3,787,500 |
+
+`npm --prefix functions run test:pricing` pins those four, checks the two methods
+never mix, and covers missing, zero, negative, fractional and non-numeric
+inputs. It runs in CI.
+
 ### Bus charter
 
 A bus is hired as a whole vehicle for a **round trip**, so the billed distance is

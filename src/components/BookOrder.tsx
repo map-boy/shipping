@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DestinationPicker from "./DestinationPicker";
 import RoutePreviewMap from "./RoutePreviewMap";
@@ -6,7 +6,7 @@ import { quoteFare, quoteTruckFare, type FareQuote } from "../lib/pricing";
 import { createTripRequest } from "../lib/trips";
 import {
   VEHICLE_LABELS, VEHICLE_CARRIES, formatRwf,
-  TRUCK_TONNES_BASE_RWF, TRUCK_RATE, TRUCK_LOOSE_TONNES,
+  TRUCK_BASE_PRICE_RWF, TRUCK_RATE, TRUCK_TONNE_UNIT, TRUCK_TOUR_UNIT,
   type TripType, type VehicleType, type TruckPackage,
 } from "../lib/catalog";
 import type { GeocodeResult } from "../lib/geocode";
@@ -14,7 +14,7 @@ import { fetchRoute } from "../lib/directions";
 import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { useToast } from "../context/toast";
 import { describeCallableError, backendReachable } from "../lib/callableError";
-import { ensureUser } from "../lib/ensureUser";
+import { ensureUser, GuestSignInError } from "../lib/ensureUser";
 
 type Step = 1 | 2 | 3;
 
@@ -68,6 +68,12 @@ export default function BookOrder() {
   const [backendDown, setBackendDown] = useState(false);
   const [acceptedExtra, setAcceptedExtra] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  /**
+   * State updates are async, so two taps landing in the same tick would both
+   * pass a `submitting` check and create two orders. A ref flips synchronously.
+   */
+  const inFlightRef = useRef(false);
 
   // Only the truck is freight-only. A bus is a 29-seat passenger charter, so
   // deriving "goods" from its "both" capability would have mislabelled it.
@@ -135,6 +141,7 @@ export default function BookOrder() {
         });
         setQuote({
           ...truck,
+          formula: truck.formula,
           label: VEHICLE_LABELS.truck,
           maxLoadKg: 30000,
           serviceClass: "express",
@@ -184,12 +191,17 @@ export default function BookOrder() {
   );
 
   async function submit() {
-    if (!quote || !pickup || !dropoff) return;
+    if (inFlightRef.current) return;
+    if (!quote || !pickup || !dropoff || !acceptedExtra) return;
+
+    inFlightRef.current = true;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       // No login: a guest identity is created silently so the trip still has an
       // owner for the security rules and for live tracking.
       await ensureUser();
+
       const tripId = await createTripRequest({
         tripType,
         vehicleType,
@@ -197,17 +209,33 @@ export default function BookOrder() {
         handling: "ambient",
         pickup: { lat: pickup.lat, lng: pickup.lng },
         destination: { lat: dropoff.lat, lng: dropoff.lng },
+        pickupName: pickup.name,
+        destinationName: dropoff.name,
         contactName: fullName.trim(),
         contactPhone: phone.trim(),
         ...(isTruck ? { truckPackage, ...(byTours ? { tours: toursNum } : { tonnes: tonnesNum }) } : {}),
         routeDistanceKm: route?.km,
         routeDurationMin: route?.min,
       });
+
+      // Only a real trip id means the server actually wrote the order. Anything
+      // else is treated as a failure rather than announced as success.
+      if (!tripId) {
+        throw new Error("The order was not confirmed by the server.");
+      }
+
       showToast("Order placed. Finding a driver...", "success");
       navigate("/ride", { state: { tripId } });
+      return;
     } catch (err) {
-      showToast(describeCallableError(err, "place the order").message, "error");
+      const message =
+        err instanceof GuestSignInError
+          ? err.message
+          : describeCallableError(err, "place the order").message;
+      setSubmitError(message);
+      showToast(message, "error");
     } finally {
+      inFlightRef.current = false;
       setSubmitting(false);
     }
   }
@@ -321,8 +349,8 @@ export default function BookOrder() {
               </div>
               <p className="text-sm text-muted">
                 {byTours
-                  ? `${TRUCK_RATE} x number of tours x km x ${TRUCK_LOOSE_TONNES} (a tour fills the truck)`
-                  : `${TRUCK_TONNES_BASE_RWF.toLocaleString()} + (${TRUCK_RATE} x tonnes x km)`}
+                  ? `${TRUCK_RATE} x km x number of tours x ${TRUCK_TOUR_UNIT.toLocaleString()}`
+                  : `${TRUCK_BASE_PRICE_RWF.toLocaleString()} + (${TRUCK_RATE} x km x ${TRUCK_TONNE_UNIT.toLocaleString()} x tonnes)`}
               </p>
 
               <label className="block">
@@ -450,6 +478,9 @@ export default function BookOrder() {
                   <span className="text-lg font-semibold">{VEHICLE_LABELS[vehicleType]}</span>
                   <span className="text-3xl font-bold">{formatRwf(quote.price)}</span>
                 </div>
+                {quote.formula && (
+                  <p className="text-sm text-muted mt-1.5 font-mono">{quote.formula}</p>
+                )}
                 <p className="text-sm text-muted mt-1">
                   {quote.roundTrip
                     ? `${quote.seats} seats · ${quote.billableKm} km return`
@@ -483,8 +514,20 @@ export default function BookOrder() {
             </>
           )}
 
+          {submitError && (
+            <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4">
+              <p className="text-sm font-semibold text-red-700">{submitError}</p>
+            </div>
+          )}
+
+          {quote && !acceptedExtra && (
+            <p className="text-sm text-muted">
+              Tick the box above to confirm you understand the drop-off distance before ordering.
+            </p>
+          )}
+
           <div className="flex gap-3">
-            <button onClick={() => setStep(2)} className="btn-secondary flex-1">
+            <button onClick={() => setStep(2)} disabled={submitting} className="btn-secondary flex-1">
               Back
             </button>
             {quoteError && !quote ? (
@@ -497,7 +540,10 @@ export default function BookOrder() {
                 disabled={!quote || quoting || !acceptedExtra || submitting}
                 className="btn-primary flex-1"
               >
-                {submitting ? "Placing..." : "Place order"}
+                {submitting && (
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {submitting ? "Placing your order..." : "Place order"}
               </button>
             )}
           </div>
