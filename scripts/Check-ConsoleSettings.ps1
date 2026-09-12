@@ -154,6 +154,43 @@ if (-not $token) {
     }
 }
 
+# ------------------------------------------------------------ 3. Budget
+Head "3. Budget alerts (email warning when spend reaches a limit)"
+
+Write-Host "NOTE: a budget alert only EMAILS you. It does NOT stop spending."
+Write-Host "      To actually cap usage, set per-API quota limits (link at the end)."
+Write-Host ""
+
+$billingAcct = ""
+if ($billingEnabled) {
+    $bi = gcloud billing projects describe $ProjectId --format="value(billingAccountName)" 2>$null
+    if ($bi) { $billingAcct = ($bi -replace "billingAccounts/", "") }
+}
+
+if (-not $billingAcct) {
+    Write-Host "$warn No billing account linked, so no budget to check."
+} else {
+    $budgets = gcloud billing budgets list --billing-account=$billingAcct --format=json 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "$warn Could not list budgets. The API may be off:"
+        Write-Host "        gcloud services enable billingbudgets.googleapis.com --project $ProjectId"
+    } else {
+        $bl = @($budgets | ConvertFrom-Json)
+        if ($bl.Count -eq 0) {
+            Write-Host "$no NO budget alert is set. You will not be warned about charges."
+        } else {
+            foreach ($x in $bl) {
+                $amt = $x.amount.specifiedAmount
+                $units = if ($amt.units) { $amt.units } else { "0" }
+                Write-Host "$ok $($x.displayName): $units $($amt.currencyCode)"
+                foreach ($r in $x.thresholdRules) {
+                    Write-Host "        alerts at $([math]::Round($r.thresholdPercent * 100))%"
+                }
+            }
+        }
+    }
+}
+
 # ------------------------------------------------------------- Fix commands
 Head "Fix commands (nothing above changed anything)"
 
@@ -176,6 +213,19 @@ Write-Host "  # Replace the X's with a REAL id from section 1. Do not paste it l
 Write-Host ""
 Write-Host "-- Enable the Maps APIs ------------------------------------------"
 Write-Host "  gcloud services enable $($needed -join ' ') --project $ProjectId"
+
+Write-Host ""
+Write-Host "-- Set a 1 USD budget alert --------------------------------------"
+Write-Host "  gcloud services enable billingbudgets.googleapis.com --project $ProjectId"
+Write-Host "  gcloud billing budgets create --billing-account=$billingAcct ``"
+Write-Host "    --display-name='TikTak 1 USD alert' --budget-amount=1USD ``"
+Write-Host "    --filter-projects='projects/$ProjectId' ``"
+Write-Host "    --threshold-rule=percent=0.5 --threshold-rule=percent=0.9 --threshold-rule=percent=1.0"
+
+Write-Host ""
+Write-Host "-- Hard caps that actually STOP spending (console) ----------------"
+Write-Host "  https://console.cloud.google.com/apis/api/geocoding-backend.googleapis.com/quotas?project=$ProjectId"
+Write-Host "  https://console.cloud.google.com/apis/credentials?project=$ProjectId  (restrict the API key)"
 
 Write-Host ""
 Write-Host "-- Re-run this script to confirm ---------------------------------"
