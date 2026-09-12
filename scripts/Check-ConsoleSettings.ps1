@@ -170,23 +170,33 @@ if ($billingEnabled) {
 if (-not $billingAcct) {
     Write-Host "$warn No billing account linked, so no budget to check."
 } else {
-    $budgets = gcloud billing budgets list --billing-account=$billingAcct --format=json 2>&1
+    # Let gcloud do the formatting. PowerShell 5.1 hands ConvertFrom-Json a
+    # JSON array as ONE object, so parsing it here printed every budget's
+    # fields concatenated into a single unreadable line.
+    $names = @(gcloud billing budgets list --billing-account=$billingAcct --format="value(displayName)" 2>&1)
     if ($LASTEXITCODE -ne 0) {
         Write-Host "$warn Could not list budgets. The API may be off:"
         Write-Host "        gcloud services enable billingbudgets.googleapis.com --project $ProjectId"
+    } elseif ($names.Count -eq 0 -or ($names -join "").Trim() -eq "") {
+        Write-Host "$no NO budget alert is set. You will not be warned about charges."
     } else {
-        $bl = @($budgets | ConvertFrom-Json)
-        if ($bl.Count -eq 0) {
-            Write-Host "$no NO budget alert is set. You will not be warned about charges."
-        } else {
-            foreach ($x in $bl) {
-                $amt = $x.amount.specifiedAmount
-                $units = if ($amt.units) { $amt.units } else { "0" }
-                Write-Host "$ok $($x.displayName): $units $($amt.currencyCode)"
-                foreach ($r in $x.thresholdRules) {
-                    Write-Host "        alerts at $([math]::Round($r.thresholdPercent * 100))%"
-                }
+        Write-Host "Budgets on this billing account (it may cover several projects):"
+        gcloud billing budgets list --billing-account=$billingAcct --format="table(
+            displayName:label=NAME,
+            amount.specifiedAmount.units:label=AMOUNT,
+            amount.specifiedAmount.currencyCode:label=CUR,
+            budgetFilter.projects.list():label=APPLIES_TO)"
+
+        # Two budgets with one name is almost always an accidental re-run.
+        $dupes = @($names | Group-Object | Where-Object { $_.Count -gt 1 })
+        if ($dupes.Count -gt 0) {
+            Write-Host ""
+            foreach ($d in $dupes) {
+                Write-Host "$warn DUPLICATE: '$($d.Name)' exists $($d.Count) times."
             }
+            Write-Host "      Delete the extras - each one emails you separately:"
+            Write-Host "        gcloud billing budgets list --billing-account=$billingAcct --format='value(name)'"
+            Write-Host "        gcloud billing budgets delete BUDGET_ID --billing-account=$billingAcct"
         }
     }
 }
