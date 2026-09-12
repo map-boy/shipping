@@ -6,7 +6,7 @@ import { quoteFare, quoteTruckFare, type FareQuote } from "../lib/pricing";
 import { createTripRequest } from "../lib/trips";
 import {
   VEHICLE_LABELS, VEHICLE_CARRIES, formatRwf,
-  TRUCK_TONNES_BASE_RWF, TRUCK_RATE_PER_TONNE_KM, TRUCK_TONNES_PER_TOUR,
+  TRUCK_BASE_PRICE_RWF, TRUCK_RATE, TRUCK_TONNE_UNIT, TRUCK_TOUR_UNIT,
   type TripType, type VehicleType, type TruckPackage,
 } from "../lib/catalog";
 import type { GeocodeResult } from "../lib/geocode";
@@ -141,6 +141,7 @@ export default function BookOrder() {
         });
         setQuote({
           ...truck,
+          formula: truck.formula,
           label: VEHICLE_LABELS.truck,
           maxLoadKg: 30000,
           serviceClass: "express",
@@ -348,8 +349,8 @@ export default function BookOrder() {
               </div>
               <p className="text-sm text-muted">
                 {byTours
-                  ? `${(TRUCK_RATE_PER_TONNE_KM * TRUCK_TONNES_PER_TOUR).toLocaleString()} RWF per km, per tour (a tour is a full ${TRUCK_TONNES_PER_TOUR} t load)`
-                  : `${TRUCK_TONNES_BASE_RWF.toLocaleString()} RWF + ${TRUCK_RATE_PER_TONNE_KM} RWF per tonne, per km`}
+                  ? `${TRUCK_RATE} x km x number of tours x ${TRUCK_TOUR_UNIT.toLocaleString()}`
+                  : `${TRUCK_BASE_PRICE_RWF.toLocaleString()} + (${TRUCK_RATE} x km x ${TRUCK_TONNE_UNIT.toLocaleString()} x tonnes)`}
               </p>
 
               <label className="block">
@@ -477,6 +478,9 @@ export default function BookOrder() {
                   <span className="text-lg font-semibold">{VEHICLE_LABELS[vehicleType]}</span>
                   <span className="text-3xl font-bold">{formatRwf(quote.price)}</span>
                 </div>
+                {quote.formula && (
+                  <p className="text-sm text-muted mt-1.5 font-mono">{quote.formula}</p>
+                )}
                 <p className="text-sm text-muted mt-1">
                   {quote.roundTrip
                     ? `${quote.seats} seats · ${quote.billableKm} km return`

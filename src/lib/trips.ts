@@ -46,6 +46,7 @@ export interface TripRequest {
   contactName?: string;
   quotedDistanceKm?: number;
   pricingMethod?: "truck_tonnes" | "truck_tours" | "bus_charter" | "metered";
+  formula?: string;
   pickupName?: string;
   destinationName?: string;
   extraDistanceChargeable?: boolean;

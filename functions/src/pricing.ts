@@ -2,12 +2,12 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import {
   VEHICLES, SERVICE_CLASS_SPECS, HANDLING_SPECS,
   parseVehicleType, parseServiceClass, parseHandling, assertServiceable, promisedWindow,
-  parseTruckPackage, parseTonnes, parseTours, TRUCK_PACKAGED_BASE_RWF, TRUCK_RATE_PER_KM_TONNE,
-  TRUCK_DEFAULT_TOURS, TRUCK_LOOSE_TONNES,
+  parseTruckPackage, parseTonnes, parseTours, TRUCK_PACKAGED_BASE_RWF,
   BUS_SEATS, BUS_RATE_PER_KM_SEAT, BUS_MINIMUM_RWF, BUS_MINIMUM_EACH_WAY_KM,
   type VehicleType, type ServiceClass, type Handling, type TruckPackage,
 } from "./lib/catalog";
 import { distanceKm, round1 } from "./lib/geo";
+import { calculateTruckPrice } from "./lib/truckPricing";
 import { requireLatLng } from "./lib/validate";
 import { refreshMarket } from "./marketplace";
 import { FALLBACK_SPEED_KMH } from "./lib/constants";
@@ -32,6 +32,8 @@ export interface FareBreakdown {
 
 export interface TruckFareBreakdown extends FareBreakdown {
   truckPackage: TruckPackage;
+  /** The arithmetic that produced this price, for the UI to show verbatim. */
+  formula: string;
   /** Truckloads, when billing by tours. 1 for a tonnage load. */
   tours: number;
   tonnes: number;
@@ -181,16 +183,17 @@ export function computeTruckFare(options: {
   at?: number;
 }): TruckFareBreakdown {
   const { distanceKm: km, truckPackage } = options;
+
+  // All truck arithmetic lives in calculateTruckPrice. This function only
+  // decorates it with the fields the rest of the trip record needs.
+  const result = calculateTruckPrice({
+    pricingMethod: truckPackage,
+    distanceKm: km,
+    tonnes: options.tonnes,
+    numberOfTours: options.tours,
+  });
+
   const byTours = truckPackage === "tours";
-
-  const tours = byTours ? options.tours ?? TRUCK_DEFAULT_TOURS : 1;
-  const tonnes = byTours ? 0 : options.tonnes ?? 0;
-
-  const units = byTours ? tours * TRUCK_LOOSE_TONNES : tonnes;
-  const distanceFare = km * units * TRUCK_RATE_PER_KM_TONNE;
-  const baseFare = byTours ? 0 : TRUCK_PACKAGED_BASE_RWF;
-  const price = baseFare + distanceFare;
-
   const durationMin = options.durationMin ?? Math.round((km / FALLBACK_SPEED_KMH) * 60);
   const at = options.at ?? Date.now();
   const { promisedFrom, promisedBy } = promisedWindow("express", at);
@@ -201,19 +204,20 @@ export function computeTruckFare(options: {
     vehicleType: "truck",
     serviceClass: "express",
     handling: "ambient",
-    baseFare,
-    distanceFare,
-    subtotal: price,
+    baseFare: byTours ? 0 : TRUCK_PACKAGED_BASE_RWF,
+    distanceFare: result.price - (byTours ? 0 : TRUCK_PACKAGED_BASE_RWF),
+    subtotal: result.price,
     serviceMultiplier: 1,
     handlingMultiplier: 1,
     surgeMultiplier: 1,
-    price,
+    price: result.price,
     currency: "RWF",
     promisedFrom,
     promisedBy,
     truckPackage,
-    tonnes,
-    tours,
+    tonnes: result.tonnes,
+    tours: result.numberOfTours,
+    formula: result.formula,
   };
 }
 

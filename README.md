@@ -57,14 +57,16 @@ Bus and truck are priced by their own tariffs and ignore the table below.
 
 ### Truck freight
 
-| Billing | Formula |
-| --- | --- |
-| By tonnes | `250,000 + (250 x km x tonnes)` |
-| By tours | `7,500 x km x tours` |
+```
+by tonnes:  250,000 + (0.25 x distanceKm x 1,000 x tonnes)
+by tours:   0.25 x distanceKm x numberOfTours x 30,000
+```
 
-Both are the same underlying rate of **250 RWF per tonne-km** - the tariff writes
-it as `0.25 x 1000` - and a tour is one full 30 t truckload, so
-`0.25 x 30,000 = 7,500` per tour-km. Only tonnage carries the 250,000 floor.
+Both live in one function, `calculateTruckPrice` in
+`functions/src/lib/truckPricing.ts`. Nothing else computes a truck price:
+`quoteTruckFare` and `createTrip` both call it, and the browser never calculates
+at all - it displays the `formula` string the server returns, so the customer
+reads the exact arithmetic that produced their price.
 
 | Case | Price |
 | --- | --- |
@@ -72,6 +74,10 @@ it as `0.25 x 1000` - and a tour is one full 30 t truckload, so
 | 101 km, 5 tonnes | 376,250 |
 | 101 km, 1 tour | 757,500 |
 | 101 km, 5 tours | 3,787,500 |
+
+`npm --prefix functions run test:pricing` pins those four, checks the two methods
+never mix, and covers missing, zero, negative, fractional and non-numeric
+inputs. It runs in CI.
 
 ### Bus charter
 

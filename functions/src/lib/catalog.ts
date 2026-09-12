@@ -78,17 +78,7 @@ const LEGACY_TRUCK_PACKAGES: Record<string, TruckPackage> = {
 /** Floor charge on a tonnage load; the per-km rate is added on top of it. */
 export const TRUCK_PACKAGED_BASE_RWF = 250_000;
 
-/**
- * 250 RWF per tonne-km. Written as 0.25 x 1000 in the tariff the client gave:
- *
- *   tonnes: 250,000 + (0.25 x km x 1000 x tonnes)
- *   tours:  0.25 x km x tours x 30,000
- *
- * Both reduce to the same rate, because a tour is one full 30 t truckload:
- * 0.25 x 30,000 = 7,500 per tour-km = 250 x 30 tonnes. Holding it as 0.25 made
- * every quote 1000x too low - a truck to Kayonza priced at 20 RWF.
- */
-export const TRUCK_RATE_PER_KM_TONNE = 250;
+// Truck pricing lives in lib/truckPricing.ts - see calculateTruckPrice.
 
 /** One tour is one full truckload, billed as 30 tonnes. */
 export const TRUCK_LOOSE_TONNES = 30;
