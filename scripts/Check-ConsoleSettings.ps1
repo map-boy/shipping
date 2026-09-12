@@ -7,6 +7,11 @@
   Changes nothing. It reports, for each setting, whether it is already on,
   and whether YOUR account has what is needed to turn it on from the CLI.
   Fix commands are printed at the end; you run them yourself.
+
+.NOTES
+  If Windows refuses to run this with "running scripts is disabled",
+  unblock it for this window only:
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 #>
 
 $ErrorActionPreference = "Continue"
@@ -88,7 +93,7 @@ $needed = @(
 $enabled = gcloud services list --enabled --project $ProjectId --format="value(config.name)" 2>&1
 if ($LASTEXITCODE -eq 0) {
     foreach ($svc in $needed) {
-        if ($enabled -contains $svc) { Write-Host "$ok $svc" }
+        if (@($enabled) -contains $svc) { Write-Host "$ok $svc" }
         else                         { Write-Host "$no $svc  (not enabled)" }
     }
 } else {
