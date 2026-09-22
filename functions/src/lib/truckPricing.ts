@@ -6,7 +6,8 @@ import { HttpsError } from "firebase-functions/v2/https";
  * Written in exactly the form the tariff was given, so it can be checked against
  * the spec line by line rather than mentally re-derived:
  *
- *   by tonnes: 250,000 + (0.25 x distanceKm x 1,000 x tonnes)
+ *   by tonnes: if (0.25 x distanceKm x 1,000 x tonnes) < 250,000, price = 250,000
+ *              else price = 0.25 x distanceKm x 1,000 x tonnes
  *   by tours:  0.25 x distanceKm x numberOfTours x 30,000
  *
  * Nothing else may compute a truck price. quoteTruckFare and createTrip both
@@ -68,15 +69,16 @@ export function calculateTruckPrice(input: {
   if (pricingMethod === "tonnes") {
     const tonnes = requirePositive(input.tonnes, "Tonnes");
 
-    // 250,000 + (0.25 x km x 1,000 x tonnes)
-    const price = TRUCK_BASE_PRICE_RWF + TRUCK_RATE * distanceKm * TRUCK_TONNE_UNIT * tonnes;
+    // if (0.25 x km x 1,000 x tonnes) < 250,000, price = 250,000; else price = the computed value
+    const computed = TRUCK_RATE * distanceKm * TRUCK_TONNE_UNIT * tonnes;
+  const price = computed < TRUCK_BASE_PRICE_RWF ? TRUCK_BASE_PRICE_RWF : computed;
 
     return {
       price,
       formula:
-        `${TRUCK_BASE_PRICE_RWF.toLocaleString()} + ` +
-        `(${TRUCK_RATE} x ${distanceKm} km x ${TRUCK_TONNE_UNIT.toLocaleString()} x ${tonnes} t) = ` +
-        `${price.toLocaleString()} RWF`,
+        computed < TRUCK_BASE_PRICE_RWF
+          ? `${TRUCK_BASE_PRICE_RWF.toLocaleString()} (minimum) = ${price.toLocaleString()} RWF`
+          : `${TRUCK_RATE} x ${distanceKm} km x ${TRUCK_TONNE_UNIT.toLocaleString()} x ${tonnes} t = ${price.toLocaleString()} RWF`,
       pricingMethod,
       distanceKm,
       tonnes,

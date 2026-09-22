@@ -350,7 +350,7 @@ export default function BookOrder() {
               <p className="text-sm text-muted">
                 {byTours
                   ? `${TRUCK_RATE} x km x number of tours x ${TRUCK_TOUR_UNIT.toLocaleString()}`
-                  : `${TRUCK_BASE_PRICE_RWF.toLocaleString()} + (${TRUCK_RATE} x km x ${TRUCK_TONNE_UNIT.toLocaleString()} x tonnes)`}
+                  : `min ${TRUCK_BASE_PRICE_RWF.toLocaleString()}, else ${TRUCK_RATE} x km x ${TRUCK_TONNE_UNIT.toLocaleString()} x tonnes`}
               </p>
 
               <label className="block">
