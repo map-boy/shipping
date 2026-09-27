@@ -42,3 +42,7 @@ clone/
 src-dump.txt
 code_dump_for_review.txt
 all_src_code.txt
+
+calc_search_results.txt
+truck_formula_check.txt
+*.bak
