@@ -1,4 +1,5 @@
-import { loadGoogleMaps } from "./googleMapsLoader";
+﻿import { loadGoogleMaps } from "./googleMapsLoader";
+import { isRoadCodeQuery, expandRoadCode } from "./kigaliRoads";
 
 export interface GeocodeResult {
   name: string;
@@ -129,5 +130,15 @@ export async function findPlaces(query: string): Promise<GeocodeResult[]> {
   } catch {
     // Places unavailable on this key - fall through to the geocoder.
   }
-  return await geocodeAddress(query);
+  const direct = await geocodeAddress(query);
+  if (direct.length > 0) return direct;
+
+  if (isRoadCodeQuery(query)) {
+    const expanded = expandRoadCode(query);
+    if (expanded) return await geocodeAddress(expanded);
+  }
+  return [];
 }
+
+
+

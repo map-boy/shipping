@@ -1,4 +1,4 @@
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+﻿import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "./lib/db";
 import {
   requireAuth, requireString, requireLatLng, normalizeRwandaMsisdn, requirePersonName,
@@ -12,6 +12,7 @@ import { computeFare, computeTruckFare, computeBusFare } from "./pricing";
 import { refreshMarket } from "./marketplace";
 import { buildOfferUpdates, clearDispatchUpdates } from "./dispatch";
 import { tripEventUpdate } from "./lib/events";
+import { sendSms } from "./lib/sms";
 import { REQUEST_TTL_MS } from "./lib/constants";
 import { ServerValue } from "firebase-admin/database";
 
@@ -223,6 +224,18 @@ export const createTrip = onCall(async (request) => {
         tripEventUpdate(tripId, { type: "no_drivers", at: Date.now(), data: { round: 1 } })
       );
     }
+  }
+
+  const opsNumbers = (process.env.OPS_SMS_NUMBERS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (opsNumbers.length > 0) {
+    void sendSms(
+      opsNumbers,
+      `New booking ${tripId}: ${vehicleType} ${tripType}, ` +
+        `${fare.price} RWF. Confirm we can accommodate this.`
+    );
   }
 
   return { tripId, ...fare, offered };
@@ -515,3 +528,4 @@ export const completeTrip = onCall(async (request) => {
 
   return { ok: true, completedAt: now, settled: paid };
 });
+
