@@ -1,46 +1,25 @@
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+﻿import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 
 /** Admin calls are rare, so they reserve almost no CPU. */
 const ADMIN_OPTS = { maxInstances: 1 } as const;
-import { timingSafeEqual } from "crypto";
 import { db } from "./lib/db";
 import { requireString } from "./lib/validate";
 import { clearDispatchUpdates } from "./dispatch";
 import { sweepDispatch } from "./scheduled";
 
-function safeEquals(a: string, b: string): boolean {
-  const bufA = Buffer.from(a, "utf8");
-  const bufB = Buffer.from(b, "utf8");
-  if (bufA.length !== bufB.length) return false;
-  return timingSafeEqual(bufA, bufB);
-}
+/**
+ * Only these signed-in emails may call admin endpoints. request.auth is set
+ * by the platform after verifying the caller's Firebase ID token signature,
+ * so this cannot be spoofed from the client. Add more emails here later.
+ */
+const ADMIN_EMAILS = new Set(["techubwenge@gmail.com"]);
 
-function checkAdminCreds(username: unknown, password: unknown) {
-  const expectedUser = process.env.ADMIN_USERNAME;
-  const expectedPass = process.env.ADMIN_PASSWORD;
-
-  // Without this guard an unset env var makes `undefined !== undefined` false
-  // and every admin endpoint opens up to anonymous callers.
-  if (!expectedUser || !expectedPass) {
-    console.error("ADMIN_USERNAME / ADMIN_PASSWORD are not configured; refusing admin call.");
-    throw new HttpsError("failed-precondition", "Admin access is not configured on this server.");
-  }
-  if (typeof username !== "string" || typeof password !== "string") {
-    throw new HttpsError("permission-denied", "Invalid admin credentials.");
-  }
-  if (!safeEquals(username, expectedUser) || !safeEquals(password, expectedPass)) {
-    throw new HttpsError("permission-denied", "Invalid admin credentials.");
+function guard(request: CallableRequest) {
+  const email = request.auth?.token?.email;
+  if (!request.auth || typeof email !== "string" || !ADMIN_EMAILS.has(email.toLowerCase())) {
+    throw new HttpsError("permission-denied", "Admin access only.");
   }
 }
-
-function guard(request: { data?: Record<string, unknown> }) {
-  checkAdminCreds(request.data?.username, request.data?.password);
-}
-
-export const adminLogin = onCall(ADMIN_OPTS, async (request) => {
-  guard(request);
-  return { ok: true };
-});
 
 export const adminListTrips = onCall(ADMIN_OPTS, async (request) => {
   guard(request);

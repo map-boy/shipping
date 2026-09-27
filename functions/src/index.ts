@@ -1,4 +1,4 @@
-import { setGlobalOptions } from "firebase-functions/v2/options";
+﻿import { setGlobalOptions } from "firebase-functions/v2/options";
 import { onTripEvent as onTripEventImpl } from "./consumers";
 
 /**
@@ -73,7 +73,6 @@ export const onTripEvent =
 
 // Admin
 export {
-  adminLogin,
   adminListTrips,
   adminListDrivers,
   adminListBans,
@@ -83,3 +82,4 @@ export {
   adminSetDriverStatus,
   adminDispatchSweep,
 } from "./admin";
+

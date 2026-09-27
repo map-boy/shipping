@@ -1,0 +1,47 @@
+﻿=== functions/src/pricing.ts ===
+
+functions\src\pricing.ts:5:  parseTruckPackage, parseTonnes, parseTours, TRUCK_PACKAGED_BASE_RWF, 
+TRUCK_RATE_PER_KM_TONNE,
+functions\src\pricing.ts:6:  TRUCK_DEFAULT_TOURS,
+functions\src\pricing.ts:35:  /** Truckloads, when billing by tours. 1 for a tonnage load. */
+functions\src\pricing.ts:36:  tours: number;
+functions\src\pricing.ts:170: *   tours:  0.25 x tours x km
+functions\src\pricing.ts:180:  tours?: number;
+functions\src\pricing.ts:184:  const byTours = truckPackage === "tours";
+functions\src\pricing.ts:186:  const tours = byTours ? options.tours ?? TRUCK_DEFAULT_TOURS : 1;
+functions\src\pricing.ts:187:  const tonnes = byTours ? 0 : options.tonnes ?? 0;
+functions\src\pricing.ts:189:  const units = byTours ? tours : tonnes;
+functions\src\pricing.ts:191:  const baseFare = byTours ? 0 : TRUCK_PACKAGED_BASE_RWF;
+functions\src\pricing.ts:216:    tours,
+functions\src\pricing.ts:317:  const byTours = truckPackage === "tours";
+functions\src\pricing.ts:318:  const tonnes = byTours ? undefined : 
+parseTonnes(request.data?.tonnes);
+functions\src\pricing.ts:319:  const tours = byTours ? parseTours(request.data?.tours) : 
+undefined;
+functions\src\pricing.ts:335:  const fare = computeTruckFare({ distanceKm: km, durationMin, 
+truckPackage, tonnes, tours });
+
+
+
+=== src/components/BookOrder.tsx ===
+
+src\components\BookOrder.tsx:9:  TRUCK_TONNES_BASE_RWF, TRUCK_RATE,
+src\components\BookOrder.tsx:324:                  ? `${TRUCK_RATE} x number of tours x km`
+src\components\BookOrder.tsx:325:                  : `${TRUCK_TONNES_BASE_RWF.toLocaleString()} + 
+(${TRUCK_RATE} x tonnes x km)`}
+
+
+
+=== src/lib/serviceCatalog.ts ===
+
+src\lib\serviceCatalog.ts:17:  pricing: string;
+src\lib\serviceCatalog.ts:29:    pricing: "By tonnes: 250,000 RWF + (0.25 x tonnes x km). By 
+tours: 0.25 x tours x km.",
+src\lib\serviceCatalog.ts:43:    pricing: "Up to 50 km each way: flat 200,000 RWF. Beyond that: 
+90 RWF x 29 seats x round-trip km.",
+src\lib\serviceCatalog.ts:56:    pricing: "2,500 RWF base + 900 RWF per km.",
+src\lib\serviceCatalog.ts:65:    pricing: "3,000 RWF base + 250 RWF per km.",
+src\lib\serviceCatalog.ts:74:    pricing: "500 RWF base + 300 RWF per km. Busy periods may add up 
+to 2.5x.",
+
+
