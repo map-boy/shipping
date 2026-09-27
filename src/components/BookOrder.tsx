@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DestinationPicker from "./DestinationPicker";
 import RoutePreviewMap from "./RoutePreviewMap";
@@ -478,13 +478,10 @@ export default function BookOrder() {
                   <span className="text-lg font-semibold">{VEHICLE_LABELS[vehicleType]}</span>
                   <span className="text-3xl font-bold">{formatRwf(quote.price)}</span>
                 </div>
-                {quote.formula && (
-                  <p className="text-sm text-muted mt-1.5 font-mono">{quote.formula}</p>
-                )}
-                <p className="text-sm text-muted mt-1">
+                                <p className="text-sm text-muted mt-1">
                   {quote.roundTrip
-                    ? `${quote.seats} seats · ${quote.billableKm} km return`
-                    : `${quote.distanceKm} km${route ? ` · about ${route.min} min` : ""}`}
+                    ? `${quote.seats} seats Â· ${quote.billableKm} km return`
+                    : `${quote.distanceKm} km${route ? ` Â· about ${route.min} min` : ""}`}
                 </p>
               </div>
 
@@ -557,3 +554,6 @@ export default function BookOrder() {
     </div>
   );
 }
+
+
+

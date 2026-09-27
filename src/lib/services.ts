@@ -1,10 +1,9 @@
-import furnitureImg from "../assets/truck-loading.jpg";
+﻿import furnitureImg from "../assets/truck-loading.jpg";
 import taxiImg from "../assets/track-driver.jpg";
 import carImg from "../assets/rental-cars.jpg";
 import vanImg from "../assets/truck-park.jpg";
 import parcelImg from "../assets/track.jpg";
 import fragileImg from "../assets/fragile-service.jpg";
-import boatImg from "../assets/boat-lake-kivu.jpg";
 import removalsImg from "../assets/KIGALI (1).jpg";
 
 export interface ServiceInfo {
@@ -58,13 +57,6 @@ export const services: ServiceInfo[] = [
       "Careful handling for delicate or high-value items, from electronics to glassware, by drivers who know how to keep them safe.",
   },
   {
-    slug: "boat-transport",
-    name: "Lake Kivu Transport",
-    img: boatImg,
-    description:
-      "Coordinate transport to and from Lake Kivu and other regional destinations with drivers experienced in longer trips.",
-  },
-  {
     slug: "removals",
     name: "Home & Office Removals",
     img: removalsImg,
@@ -72,3 +64,5 @@ export const services: ServiceInfo[] = [
       "Full home or office moves in Kigali, from a single room to a complete relocation, handled by rated local drivers.",
   },
 ];
+
+

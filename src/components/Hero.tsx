@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 import heroImg from "../assets/Kigali.jpg";
 
 const categories = [
@@ -54,3 +54,4 @@ export default function Hero() {
     </section>
   );
 }
+
