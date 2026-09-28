@@ -8,6 +8,7 @@ import Footer from "./components/Footer";
 import AuthModal from "./components/AuthModal";
 import { ToastProvider } from "./components/Toast";
 import { CartProvider } from "./components/Cart";
+import { LangProvider } from "./i18n/LangProvider";
 
 const RidePage = lazy(() => import("./components/RidePage"));
 const DriverPage = lazy(() => import("./components/DriverPage"));
@@ -36,7 +37,7 @@ export default function App() {
   }, []);
 
   return (
-    <ToastProvider>
+    <LangProvider><ToastProvider>
       <CartProvider>
         <BrowserRouter>
           <div className="min-h-screen bg-white">
@@ -63,6 +64,6 @@ export default function App() {
           </div>
         </BrowserRouter>
       </CartProvider>
-    </ToastProvider>
+    </ToastProvider></LangProvider>
   );
 }

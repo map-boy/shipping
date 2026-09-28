@@ -3,6 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 import type { User } from "firebase/auth";
 import { services } from "../lib/services";
 import { useCart } from "../context/cart";
+import { useLang } from "../i18n/context";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 interface NavbarProps {
   user: User | null;
@@ -17,6 +19,7 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const location = useLocation();
   const { itemCount } = useCart();
+  const { t } = useLang();
 
   function isActive(path: string) {
     return location.pathname === path;
@@ -58,9 +61,10 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
       <div className="bg-black py-1.5 px-4">
         <div className="max-w-7xl mx-auto px-4">
           <ul className="flex gap-3 text-[11px] sm:text-xs text-slate-300 overflow-x-auto whitespace-nowrap">
-            <li><a href="/" className={`text-white rounded ${focusRing} focus-visible:ring-offset-black`}>Personal Use</a></li>
-            <li className="text-slate-500">Business Use (coming soon)</li>
-            <li><Link to="/driver" className={`hover:text-white transition-colors rounded ${focusRing} focus-visible:ring-offset-black`}>Transport Providers</Link></li>
+            <li><a href="/" className={`text-white rounded ${focusRing} focus-visible:ring-offset-black`}>{t("nav.personal")}</a></li>
+            <li className="text-slate-500">{t("nav.business")}</li>
+            <li><Link to="/driver" className={`hover:text-white transition-colors rounded ${focusRing} focus-visible:ring-offset-black`}>{t("nav.providers")}</Link></li>
+            <li className="ml-auto pl-3"><LanguageSwitcher /></li>
           </ul>
         </div>
       </div>
