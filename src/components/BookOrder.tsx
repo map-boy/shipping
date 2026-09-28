@@ -1,4 +1,4 @@
-﻿import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import DestinationPicker from "./DestinationPicker";
 import RoutePreviewMap from "./RoutePreviewMap";
@@ -6,7 +6,7 @@ import { quoteFare, quoteTruckFare, type FareQuote } from "../lib/pricing";
 import { createTripRequest } from "../lib/trips";
 import {
   VEHICLE_LABELS, VEHICLE_CARRIES, formatRwf,
-  TRUCK_BASE_PRICE_RWF, TRUCK_RATE, TRUCK_TONNE_UNIT, TRUCK_TOUR_UNIT,
+  
   type TripType, type VehicleType, type TruckPackage,
 } from "../lib/catalog";
 import type { GeocodeResult } from "../lib/geocode";
@@ -349,8 +349,8 @@ export default function BookOrder() {
               </div>
               <p className="text-sm text-muted">
                 {byTours
-                  ? `${TRUCK_RATE} x km x number of tours x ${TRUCK_TOUR_UNIT.toLocaleString()}`
-                  : `min ${TRUCK_BASE_PRICE_RWF.toLocaleString()}, else ${TRUCK_RATE} x km x ${TRUCK_TONNE_UNIT.toLocaleString()} x tonnes`}
+                  ? "Priced per truckload and distance. Your exact price is shown before you confirm."
+                  : "Priced by weight and distance. Your exact price is shown before you confirm."}
               </p>
 
               <label className="block">
