@@ -77,6 +77,20 @@ export default function DestinationPicker({
           keyboardShortcuts: false,
         });
         mapRef.current = map;
+        const pano = map.getStreetView();
+        pano.setOptions({ enableCloseButton: true, addressControl: false, fullscreenControl: false });
+        pano.addListener("position_changed", () => {
+          const p = pano.getPosition();
+          if (!p || !pano.getVisible()) return;
+          const next = { lat: p.lat(), lng: p.lng() };
+          setCenter(next);
+          resolveAddress(next.lat, next.lng);
+        });
+        pano.addListener("visible_changed", () => {
+          if (pano.getVisible()) return;
+          const p = pano.getPosition();
+          if (p) map.setCenter(p);
+        });
         setCenter(start);
         resolveAddress(start.lat, start.lng);
 
@@ -135,6 +149,24 @@ export default function DestinationPicker({
         setError(err.message);
       },
       { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }
+
+  function openStreetView() {
+    const map = mapRef.current;
+    if (!map || !center) return;
+    new google.maps.StreetViewService().getPanorama(
+      { location: center, radius: 150 },
+      (data, status) => {
+        if (status !== google.maps.StreetViewStatus.OK || !data?.location?.latLng) {
+          setError("Street View is not available at this spot. Move the pin closer to a main road.");
+          return;
+        }
+        setError(null);
+        const pano = map.getStreetView();
+        pano.setPosition(data.location.latLng);
+        pano.setVisible(true);
+      }
     );
   }
 
@@ -240,6 +272,15 @@ export default function DestinationPicker({
         </div>
 
         <div className="px-5 pt-4 pb-5 space-y-4">
+          {!mapFailed && (
+            <button
+              type="button"
+              onClick={openStreetView}
+              className="w-full border border-gray-300 rounded-lg py-3 text-base font-semibold text-gray-900 active:bg-gray-100"
+            >
+              Check the spot in Street View
+            </button>
+          )}
           {searchOpen || mapFailed ? (
             <AddressSearch placeholder="Search for an address" onSelect={handleSearchSelect} autoFocus />
           ) : (
