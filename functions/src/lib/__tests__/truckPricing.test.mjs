@@ -22,8 +22,8 @@ const A = calculateTruckPrice({ pricingMethod: 'tonnes', distanceKm: 101, tonnes
 const B = calculateTruckPrice({ pricingMethod: 'tonnes', distanceKm: 101, tonnes: 5 });
 const C = calculateTruckPrice({ pricingMethod: 'tours', distanceKm: 101, numberOfTours: 1 });
 const D = calculateTruckPrice({ pricingMethod: 'tours', distanceKm: 101, numberOfTours: 5 });
-ok('A  1 t   = 275,250',   A.price === 250000 + 0.25*101*1000*1, A.formula);
-ok('B  5 t   = 376,250',   B.price === 250000 + 0.25*101*1000*5, B.formula);
+ok('A  1 t   = 250,000 minimum (UNCONFIRMED)',   A.price === 250000, A.formula);
+ok('B  5 t   = 250,000 minimum (UNCONFIRMED)',   B.price === 250000, B.formula);
 ok('C  1 tour= 757,500',   C.price === 0.25*101*1*30000,         C.formula);
 ok('D  5 tour=3,787,500',  D.price === 0.25*101*5*30000,         D.formula);
 

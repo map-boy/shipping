@@ -1,4 +1,4 @@
-﻿import { setGlobalOptions } from "firebase-functions/v2/options";
+import { setGlobalOptions } from "firebase-functions/v2/options";
 import { onTripEvent as onTripEventImpl } from "./consumers";
 
 /**
@@ -48,6 +48,7 @@ export { marketConditions } from "./marketplace";
 
 // Payments
 export { requestMomoPayment, checkMomoPaymentStatus, markCashPayment, requestIntouchPayment, intouchPaymentCallback } from "./payment";
+export { createDpoPayment, verifyDpoPayment, dpoNotification } from "./dpo";
 
 // Trust: ratings and proof of delivery
 export { rateTrip, confirmDelivery } from "./trust";
