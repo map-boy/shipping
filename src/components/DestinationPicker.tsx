@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { reverseGeocode } from "../lib/geocode";
 import AddressSearch from "./AddressSearch";
+import { useLang } from "../i18n/context";
 import type { GeocodeResult } from "../lib/geocode";
 
 interface Props {
@@ -20,13 +21,14 @@ const KIGALI = { lat: -1.9441, lng: 30.0619 };
  * geocoded from wherever the map settles, so the pin is always the answer.
  */
 export default function DestinationPicker({
-  title = "Set your destination",
+  title,
   initialCenter,
-  confirmLabel = "Confirm destination",
+  confirmLabel,
   onConfirm,
   onBack,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
+  const { t } = useLang();
   const mapRef = useRef<google.maps.Map | null>(null);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestSeq = useRef(0);
@@ -52,12 +54,12 @@ export default function DestinationPicker({
       })
       .catch(() => {
         if (seq !== requestSeq.current) return;
-        setAddress("Dropped pin on map");
+        setAddress(t("pick.dropped"));
       })
       .finally(() => {
         if (seq === requestSeq.current) setResolving(false);
       });
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!container.current || mapRef.current) return;
@@ -111,8 +113,8 @@ export default function DestinationPicker({
         setMapFailed(true);
         setError(
           err instanceof Error && err.message
-            ? `Map could not load: ${err.message}`
-            : "Map could not load."
+            ? t("pick.map_fail_msg", { msg: err.message })
+            : t("pick.map_fail")
         );
       });
 
@@ -120,7 +122,7 @@ export default function DestinationPicker({
       cancelled = true;
       if (idleTimer.current) clearTimeout(idleTimer.current);
     };
-  }, [initialCenter, resolveAddress]);
+  }, [initialCenter, resolveAddress, t]);
 
   /**
    * Uses the device's own GPS. This does not need Google Maps, so it is the one
@@ -128,7 +130,7 @@ export default function DestinationPicker({
    */
   function recenterToMe() {
     if (!navigator.geolocation) {
-      setError("This browser cannot report your location.");
+      setError(t("pick.no_geo"));
       return;
     }
     setLocating(true);
@@ -141,7 +143,7 @@ export default function DestinationPicker({
         } else {
           // No map to pan, so adopt the fix directly as the chosen point.
           setCenter(here);
-          setAddress("Your current location");
+          setAddress(t("pick.current"));
         }
       },
       (err) => {
@@ -159,7 +161,7 @@ export default function DestinationPicker({
       { location: center, radius: 150 },
       (data, status) => {
         if (status !== google.maps.StreetViewStatus.OK || !data?.location?.latLng) {
-          setError("Street View is not available at this spot. Move the pin closer to a main road.");
+          setError(t("pick.sv_none"));
           return;
         }
         setError(null);
@@ -183,7 +185,7 @@ export default function DestinationPicker({
 
   function confirm() {
     if (!center) return;
-    onConfirm({ name: address || "Dropped pin on map", ...center });
+    onConfirm({ name: address || t("pick.dropped"), ...center });
   }
 
   return (
@@ -193,13 +195,10 @@ export default function DestinationPicker({
 
         {mapFailed && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 px-6 text-center bg-surface">
-            <p className="text-base font-semibold">The map could not load</p>
-            <p className="text-sm text-muted">
-              You can still set this point by searching for it below, or by using your current
-              location.
-            </p>
+            <p className="text-base font-semibold">{t("pick.map_failed_title")}</p>
+            <p className="text-sm text-muted">{t("pick.map_failed_text")}</p>
             <button onClick={recenterToMe} disabled={locating} className="btn-primary max-w-xs">
-              {locating ? "Locating..." : "Use my current location"}
+              {locating ? t("pick.locating") : t("pick.use_loc")}
             </button>
           </div>
         )}
@@ -230,7 +229,7 @@ export default function DestinationPicker({
 
         <button
           onClick={onBack}
-          aria-label="Back"
+          aria-label={t("book.back")}
           className="absolute top-4 left-4 w-11 h-11 rounded-full bg-white shadow-lg flex items-center justify-center active:bg-gray-100"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -240,7 +239,7 @@ export default function DestinationPicker({
 
         <button
           onClick={recenterToMe}
-          aria-label="Centre on my location"
+          aria-label={t("pick.recenter")}
           className={`absolute bottom-4 right-4 w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center active:bg-gray-100 ${
             mapFailed ? "hidden" : ""
           }`}
@@ -265,9 +264,9 @@ export default function DestinationPicker({
         </div>
 
         <div className="px-5 pt-2 pb-4 text-center border-b border-gray-100">
-          <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{title ?? t("pick.default_title")}</h2>
           <p className="text-gray-500 mt-0.5">
-            {mapFailed ? "Search for the place, or use your location" : "Drag map to move pin"}
+            {mapFailed ? t("pick.search_or_loc") : t("pick.drag")}
           </p>
         </div>
 
@@ -278,11 +277,11 @@ export default function DestinationPicker({
               onClick={openStreetView}
               className="w-full border border-gray-300 rounded-lg py-3 text-base font-semibold text-gray-900 active:bg-gray-100"
             >
-              Check the spot in Street View
+              {t("pick.sv")}
             </button>
           )}
           {searchOpen || mapFailed ? (
-            <AddressSearch placeholder="Search for an address" onSelect={handleSearchSelect} autoFocus />
+            <AddressSearch placeholder={t("pick.search_ph")} onSelect={handleSearchSelect} autoFocus />
           ) : (
             <button
               onClick={() => setSearchOpen(true)}
@@ -290,7 +289,7 @@ export default function DestinationPicker({
             >
               <span className="w-3 h-3 bg-black rounded-[2px] shrink-0" />
               <span className={`flex-1 truncate ${resolving ? "text-gray-400" : "text-gray-900"}`}>
-                {resolving ? "Locating..." : address || "Move the map to choose"}
+                {resolving ? t("pick.locating") : address || t("pick.move")}
               </span>
               <svg className="w-5 h-5 text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="7" />
@@ -301,7 +300,7 @@ export default function DestinationPicker({
 
           {center && (
             <p className="text-sm text-muted text-center">
-              Selected: {resolving ? "Locating..." : address || "Dropped pin on map"}
+              {t("pick.selected", { addr: resolving ? t("pick.locating") : address || t("pick.dropped") })}
             </p>
           )}
 
@@ -310,7 +309,7 @@ export default function DestinationPicker({
             disabled={!center}
             className="w-full bg-black text-white rounded-lg py-4 text-lg font-semibold disabled:opacity-40 active:bg-gray-800"
           >
-            {confirmLabel}
+            {confirmLabel ?? t("pick.default_confirm")}
           </button>
         </div>
       </div>

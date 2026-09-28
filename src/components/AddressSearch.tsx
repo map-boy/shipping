@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { findPlaces, type GeocodeResult } from "../lib/geocode";
 import { searchLocalPlaces, popularPlaces, type RwandaPlace } from "../lib/rwandaPlaces";
+import { useLang } from "../i18n/context";
 
 interface Props {
   placeholder: string;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function AddressSearch({ placeholder, onSelect, autoFocus }: Props) {
+  const { t } = useLang();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -38,7 +40,7 @@ export default function AddressSearch({ placeholder, onSelect, autoFocus }: Prop
       setError(
         err instanceof Error && err.message
           ? err.message
-          : "Address search is unavailable right now."
+          : "__unavailable__"
       );
     } finally {
       if (seq === seqRef.current) setSearching(false);
@@ -118,15 +120,15 @@ export default function AddressSearch({ placeholder, onSelect, autoFocus }: Prop
         />
       </form>
 
-      {searching && <p className="mt-1.5 text-sm text-gray-500">Searching...</p>}
+      {searching && <p className="mt-1.5 text-sm text-gray-500">{t("addr.searching")}</p>}
 
-      {error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-1.5 text-sm text-red-600">{error === "__unavailable__" ? t("addr.unavailable") : error}</p>}
 
       {open && visibleResults.length > 0 && (
         <ul className="absolute left-0 right-0 z-30 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
           {!query.trim() && (
             <li className="px-4 pt-2.5 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
-              Popular places
+              {t("addr.popular")}
             </li>
           )}
           {visibleResults.map((place, i) => (
@@ -148,10 +150,7 @@ export default function AddressSearch({ placeholder, onSelect, autoFocus }: Prop
       )}
 
       {open && !searching && searched && visibleResults.length === 0 && (
-        <p className="mt-1.5 text-sm text-gray-500">
-          Nothing found for that name. Try a district or a nearby landmark, or drag the map to
-          the spot.
-        </p>
+        <p className="mt-1.5 text-sm text-gray-500">{t("addr.none")}</p>
       )}
     </div>
   );

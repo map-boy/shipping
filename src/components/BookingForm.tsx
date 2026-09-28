@@ -10,6 +10,8 @@ import type { GeocodeResult } from "../lib/geocode";
 import { useToast } from "../context/toast";
 import { useCart } from "../context/cart";
 import { describeCallableError } from "../lib/callableError";
+import { useLang } from "../i18n/context";
+import type { MsgKey } from "../i18n/messages";
 
 interface Props {
   userLocation: [number, number] | null;
@@ -27,10 +29,10 @@ const VEHICLE_GLYPH: Record<VehicleType, string> = {
   vip: "\u{1F699}",
 };
 
-function windowLabel(promisedBy: number, serviceClass: ServiceClass): string {
-  if (serviceClass === "express") return "Today";
+function windowLabel(promisedBy: number, serviceClass: ServiceClass, t: (k: MsgKey, v?: Record<string, string | number>) => string, locale: string): string {
+  if (serviceClass === "express") return t("ride.today");
   const days = Math.round((promisedBy - Date.now()) / (24 * 60 * 60 * 1000));
-  return `By ${new Date(promisedBy).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} (${days}d)`;
+  return t("ride.by", { date: new Date(promisedBy).toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" }), days });
 }
 
 export default function BookingForm({
@@ -38,6 +40,7 @@ export default function BookingForm({
 }: Props) {
   const { showToast } = useToast();
   const { addToCart } = useCart();
+  const { t, locale } = useLang();
 
   const [tripType, setTripType] = useState<TripType>("person");
   const [goodsServiceClass, setGoodsServiceClass] = useState<ServiceClass>("first");
@@ -101,20 +104,20 @@ export default function BookingForm({
   function handleAddToCart() {
     setError(null);
     if (!userLocation) {
-      showToast("Waiting for your location...", "error");
+      showToast(t("ride.waiting_loc"), "error");
       return;
     }
     if (!destination) {
-      showToast("Please choose your destination first.", "error");
+      showToast(t("ride.choose_dest_first"), "error");
       return;
     }
     if (!auth.currentUser) {
-      showToast("Please log in first.", "error");
+      showToast(t("ride.login_first"), "error");
       return;
     }
     if (!selected) return;
     if (tripType === "goods" && !goodsDescription.trim()) {
-      setError("Please describe what is being sent.");
+      setError(t("ride.describe"));
       return;
     }
 
@@ -132,7 +135,7 @@ export default function BookingForm({
       price: selected.price,
       promisedBy: selected.promisedBy,
     });
-    showToast(tripType === "person" ? "Ride added to cart." : "Delivery added to cart.", "success");
+    showToast(tripType === "person" ? t("ride.added_ride") : t("ride.added_delivery"), "success");
     setGoodsDescription("");
   }
 
@@ -141,15 +144,15 @@ export default function BookingForm({
   return (
     <div className="space-y-4">
       <div className="flex bg-surface rounded-lg p-1">
-        {(["person", "goods"] as TripType[]).map((t) => (
+        {(["person", "goods"] as TripType[]).map((tt) => (
           <button
-            key={t}
-            onClick={() => setTripType(t)}
+            key={tt}
+            onClick={() => setTripType(tt)}
             className={`flex-1 px-4 py-2.5 rounded-md text-base font-semibold transition-colors ${
-              tripType === t ? "bg-white text-ink shadow-sm" : "text-muted"
+              tripType === tt ? "bg-white text-ink shadow-sm" : "text-muted"
             }`}
           >
-            {t === "person" ? "Ride" : "Send"}
+            {tt === "person" ? t("ride.ride") : t("ride.send")}
           </button>
         ))}
       </div>
@@ -158,14 +161,14 @@ export default function BookingForm({
         <>
           <input
             type="text"
-            placeholder="What are you sending?"
+            placeholder={t("ride.what")}
             value={goodsDescription}
             onChange={(e) => setGoodsDescription(e.target.value)}
             className="field"
           />
 
           <div>
-            <p className="eyebrow mb-2">Speed</p>
+            <p className="eyebrow mb-2">{t("ride.speed")}</p>
             <div className="space-y-2">
               {SERVICE_CLASSES.map((sc) => (
                 <button
@@ -174,40 +177,40 @@ export default function BookingForm({
                   className={`choice-row ${serviceClass === sc.value ? "choice-row-on" : "choice-row-off"}`}
                 >
                   <span>
-                    <span className="block font-semibold">{sc.label}</span>
-                    <span className="block text-sm text-muted">{sc.description}</span>
+                    <span className="block font-semibold">{t(`sc.${sc.value}.label` as MsgKey)}</span>
+                    <span className="block text-sm text-muted">{t(`sc.${sc.value}.desc` as MsgKey)}</span>
                   </span>
-                  <span className="text-sm font-semibold shrink-0 ml-3">{sc.window}</span>
+                  <span className="text-sm font-semibold shrink-0 ml-3">{t(`sc.${sc.value}.window` as MsgKey)}</span>
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="eyebrow mb-2">Temperature</p>
+            <p className="eyebrow mb-2">{t("ride.temp")}</p>
             <div className="flex gap-2">
               {HANDLING_OPTIONS.map((h) => (
                 <button
                   key={h.value}
                   onClick={() => setGoodsHandling(h.value)}
-                  title={h.detail}
+                  title={t(`hd.${h.value}.detail` as MsgKey)}
                   className={`flex-1 px-2 py-3 rounded-lg text-sm font-semibold border-2 transition-colors ${
                     handling === h.value ? "border-ink bg-white text-ink" : "border-transparent bg-surface text-muted"
                   }`}
                 >
-                  {h.value === "ambient" ? "RT" : h.label}
+                  {h.value === "ambient" ? t("ride.rt") : t(`hd.${h.value}.label` as MsgKey)}
                 </button>
               ))}
             </div>
             <p className="text-sm text-muted mt-1.5">
-              {HANDLING_OPTIONS.find((h) => h.value === handling)?.detail}
+              {t(`hd.${handling}.detail` as MsgKey)}
             </p>
           </div>
         </>
       )}
 
       {!destination && (
-        <p className="text-sm text-muted">Choose a destination to see prices.</p>
+        <p className="text-sm text-muted">{t("ride.choose_dest")}</p>
       )}
       {destination && (
         <div className="flex items-center gap-3 py-1">
@@ -218,11 +221,11 @@ export default function BookingForm({
 
       {surging && (
         <p className="text-sm bg-surface text-ink rounded-lg px-4 py-3 font-medium">
-          Busy right now &mdash; fares are {market!.surgeMultiplier}&times; until demand settles.
+          {t("ride.busy", { x: market!.surgeMultiplier })}
         </p>
       )}
 
-      {loadingQuotes && <p className="text-sm text-muted">Getting prices...</p>}
+      {loadingQuotes && <p className="text-sm text-muted">{t("ride.getting")}</p>}
       {(error || quoteError) && <p className="text-red-600 text-sm">{error ?? quoteError}</p>}
 
       {quotes.length > 0 && (
@@ -237,15 +240,11 @@ export default function BookingForm({
                 <span className="text-2xl shrink-0" aria-hidden="true">{VEHICLE_GLYPH[q.vehicleType]}</span>
                 <span className="min-w-0">
                   <span className="block font-semibold truncate">
-                    {q.label}
-                    {q.roundTrip ? " charter" : ""}
+                    {t(`vehicle.${q.vehicleType}` as MsgKey)}
+                    {q.roundTrip ? t("ride.charter") : ""}
                   </span>
                   <span className="block text-sm text-muted truncate">
-                    {q.roundTrip
-                      ? `${q.seats} seats · ${q.billableKm} km return`
-                      : `${windowLabel(q.promisedBy, q.serviceClass)} · ${q.distanceKm} km${
-                          q.maxLoadKg ? ` · ${q.maxLoadKg} kg` : ""
-                        }`}
+                    {q.roundTrip ? t("ride.seats_return", { seats: q.seats ?? "", km: q.billableKm ?? "" }) : [windowLabel(q.promisedBy, q.serviceClass, t, locale), t("ride.km", { km: q.distanceKm }), q.maxLoadKg ? t("ride.kg", { kg: q.maxLoadKg }) : ""].filter(Boolean).join(" \u00b7 ")}
                   </span>
                 </span>
               </span>
@@ -257,22 +256,13 @@ export default function BookingForm({
 
       {selected?.roundTrip && (
         <div className="rounded-lg bg-surface px-4 py-3 space-y-1">
-          <p className="eyebrow">How this charter is priced</p>
+          <p className="eyebrow">{t("ride.charter_title")}</p>
           {selected.minimumApplied ? (
-            <p className="text-sm">
-              Up to {BUS_MINIMUM_EACH_WAY_KM} km each way is a flat{" "}
-              <span className="font-semibold">{formatRwf(BUS_MINIMUM_RWF)}</span> minimum.
-            </p>
+            <p className="text-sm">{t("ride.flat", { km: BUS_MINIMUM_EACH_WAY_KM, amount: formatRwf(BUS_MINIMUM_RWF) })}</p>
           ) : (
-            <p className="text-sm">
-              {BUS_RATE_PER_KM_SEAT} RWF &times; {BUS_SEATS} seats &times; {selected.billableKm} km
-              return = <span className="font-semibold">{formatRwf(selected.price)}</span>
-            </p>
+            <p className="text-sm">{t("ride.formula", { rate: BUS_RATE_PER_KM_SEAT, seats: BUS_SEATS, km: selected.billableKm ?? "", amount: formatRwf(selected.price) })}</p>
           )}
-          <p className="text-sm text-muted">
-            {selected.eachWayKm} km each way, billed both ways. The whole bus is hired, so
-            speed and temperature options do not change the price.
-          </p>
+          <p className="text-sm text-muted">{t("ride.each_way", { km: selected.eachWayKm ?? "" })}</p>
         </div>
       )}
 
@@ -281,7 +271,7 @@ export default function BookingForm({
         disabled={!selected || loadingQuotes}
         className="btn-primary"
       >
-        {selected ? `Add ${VEHICLE_GLYPH[selected.vehicleType]} · ${formatRwf(selected.price)}` : "Choose a destination"}
+        {selected ? t("ride.add", { glyph: VEHICLE_GLYPH[selected.vehicleType], price: formatRwf(selected.price) }) : t("ride.choose_dest_btn")}
       </button>
     </div>
   );

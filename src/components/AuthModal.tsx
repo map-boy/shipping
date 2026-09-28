@@ -6,6 +6,7 @@ import {
   GoogleAuthProvider,
 } from "firebase/auth";
 import { auth } from "../firebase";
+import { useLang } from "../i18n/context";
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -14,6 +15,7 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ onClose }: AuthModalProps) {
+  const { t } = useLang();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +34,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : t("auth.wrong"));
     } finally {
       setLoading(false);
     }
@@ -45,7 +47,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
       await signInWithPopup(auth, googleProvider);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(err instanceof Error ? err.message : t("auth.wrong"));
     } finally {
       setLoading(false);
     }
@@ -57,13 +59,13 @@ export default function AuthModal({ onClose }: AuthModalProps) {
         <button
           onClick={onClose}
           className="absolute top-3 right-3 w-10 h-10 leading-none text-2xl text-gray-400 hover:text-gray-600"
-          aria-label="Close"
+          aria-label={t("auth.close")}
         >
           {"\u00d7"}
         </button>
 
         <h2 className="text-xl font-bold text-gray-900 mb-6">
-          {mode === "login" ? "Log in" : "Sign up"}
+          {mode === "login" ? t("auth.login") : t("auth.signup")}
         </h2>
 
         {error && (
@@ -76,7 +78,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
           <input
             type="email"
             required
-            placeholder="Email"
+            placeholder={t("auth.email")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-700"
@@ -84,7 +86,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
           <input
             type="password"
             required
-            placeholder="Password"
+            placeholder={t("auth.password")}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full border border-gray-300 rounded-lg px-3 py-3 text-base text-gray-700"
@@ -94,13 +96,13 @@ export default function AuthModal({ onClose }: AuthModalProps) {
             disabled={loading}
             className="w-full bg-cta hover:bg-ctaHover text-white font-semibold py-3.5 text-base rounded-lg transition disabled:opacity-50"
           >
-            {loading ? "Please wait..." : mode === "login" ? "Log in" : "Sign up"}
+            {loading ? t("auth.wait") : mode === "login" ? t("auth.login") : t("auth.signup")}
           </button>
         </form>
 
         <div className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-xs text-gray-400">OR</span>
+          <span className="text-xs text-gray-400">{t("auth.or")}</span>
           <div className="flex-1 h-px bg-gray-200" />
         </div>
 
@@ -109,17 +111,17 @@ export default function AuthModal({ onClose }: AuthModalProps) {
           disabled={loading}
           className="w-full border border-gray-300 rounded-lg py-3.5 text-base font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
         >
-          Continue with Google
+          {t("auth.google")}
         </button>
 
         <p className="text-sm text-gray-500 text-center mt-5">
-          {mode === "login" ? "Don't have an account?" : "Already have an account?"}{" "}
+          {mode === "login" ? t("auth.no_account") : t("auth.have_account")}{" "}
           <button
             type="button"
             onClick={() => setMode(mode === "login" ? "signup" : "login")}
             className="text-cta font-medium hover:underline"
           >
-            {mode === "login" ? "Sign up" : "Log in"}
+            {mode === "login" ? t("auth.signup") : t("auth.login")}
           </button>
         </p>
       </div>

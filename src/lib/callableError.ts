@@ -1,5 +1,7 @@
 import { httpsCallable, type FunctionsError } from "firebase/functions";
 import { functions } from "../firebase";
+import { tr } from "../i18n/active";
+import type { MsgKey } from "../i18n/messages";
 
 /**
  * Turns a Firebase callable failure into something a user - or whoever is
@@ -8,7 +10,7 @@ import { functions } from "../firebase";
  * The SDK reports "internal" for anything it cannot interpret, including a 404
  * for a function that was never deployed. That single word sent us chasing
  * pricing bugs that did not exist, so the code is always surfaced alongside a
- * plain explanation.
+ * plain explanation. Messages follow the language chosen in the switcher.
  */
 export interface CallableFailure {
   message: string;
@@ -23,16 +25,22 @@ function codeOf(err: unknown): string {
   return "unknown";
 }
 
-const EXPLANATIONS: Record<string, string> = {
-  unauthenticated: "Please log in and try again.",
-  "permission-denied": "You are not allowed to do that.",
-  "invalid-argument": "Some of the details are not valid. Please check and try again.",
-  "failed-precondition": "This cannot be done yet.",
-  aborted: "Someone else got there first. Please try again.",
-  "not-found": "That is no longer available.",
-  "resource-exhausted": "Too many requests. Please wait a moment and try again.",
-  unavailable: "The service is temporarily unreachable. Please try again shortly.",
-  "deadline-exceeded": "That took too long. Please check your connection and try again.",
+const KNOWN_CODES = new Set([
+  "unauthenticated",
+  "permission-denied",
+  "invalid-argument",
+  "failed-precondition",
+  "aborted",
+  "not-found",
+  "resource-exhausted",
+  "unavailable",
+  "deadline-exceeded",
+]);
+
+const ACTION_KEYS: Record<string, MsgKey> = {
+  "calculate a price": "act.quote",
+  "place the order": "act.order",
+  "get a price": "act.getprice",
 };
 
 /** Codes that mean "nothing answered", as opposed to "your request was wrong". */
@@ -45,20 +53,18 @@ export function describeCallableError(err: unknown, action: string): CallableFai
 
   console.error(`[callable] ${action} failed`, { code, error: err });
 
+  const what = ACTION_KEYS[action] ? tr(ACTION_KEYS[action]) : action;
+
   if (code === "internal" || code === "unknown") {
-    return {
-      code,
-      looksUndeployed: true,
-      message:
-        `Could not ${action}. The server did not answer, which usually means the ` +
-        `Cloud Functions are not deployed yet.`,
-    };
+    return { code, looksUndeployed: true, message: tr("err.undeployed", { action: what }) };
   }
 
   return {
     code,
     looksUndeployed: UNDEPLOYED_CODES.has(code),
-    message: serverMessage || EXPLANATIONS[code] || `Could not ${action}.`,
+    message:
+      serverMessage ||
+      (KNOWN_CODES.has(code) ? tr(`err.${code}` as MsgKey) : tr("err.generic", { action: what })),
   };
 }
 

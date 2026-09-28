@@ -9,15 +9,18 @@ import { listenToActiveTrip, cancelTrip, dispatchTick, type TripRequest } from "
 import { formatRwf, type VehicleType } from "../lib/catalog";
 import type { GeocodeResult } from "../lib/geocode";
 import { useToast } from "../context/toast";
+import { useLang } from "../i18n/context";
+import type { MsgKey } from "../i18n/messages";
 
-const STATUS_COPY: Record<string, string> = {
-  requested: "Finding you a driver...",
-  accepted: "Driver on the way",
-  in_progress: "On the way to the destination",
+const STATUS_COPY: Record<string, MsgKey> = {
+  requested: "ride.st.requested",
+  accepted: "ride.st.accepted",
+  in_progress: "ride.st.in_progress",
 };
 
 export default function RidePage() {
   const { showToast } = useToast();
+  const { t, locale } = useLang();
   const [user, setUser] = useState<User | null>(auth.currentUser);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [trip, setTrip] = useState<TripRequest | null>(null);
@@ -66,9 +69,9 @@ export default function RidePage() {
     setCancelling(true);
     try {
       await cancelTrip(activeTrip.id);
-      showToast("Trip cancelled.", "success");
+      showToast(t("trip.cancelled"), "success");
     } catch (err) {
-      showToast(err instanceof Error && err.message ? err.message : "Could not cancel the trip.", "error");
+      showToast(err instanceof Error && err.message ? err.message : t("trip.cancel_fail"), "error");
     } finally {
       setCancelling(false);
     }
@@ -134,7 +137,7 @@ export default function RidePage() {
           >
             <span className="w-2.5 h-2.5 bg-ink rounded-[2px] shrink-0" />
             <span className={`flex-1 truncate text-lg font-semibold ${destination ? "text-ink" : "text-muted"}`}>
-              {destination ? destination.name : "Where to?"}
+              {destination ? destination.name : t("trip.where")}
             </span>
           </button>
         </div>
@@ -145,7 +148,7 @@ export default function RidePage() {
           onClick={() => setSheetOpen(true)}
           className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 bg-ink text-white font-semibold px-6 py-3.5 rounded-full shadow-[0_2px_12px_rgba(0,0,0,0.28)] active:bg-ink2"
         >
-          {activeTrip ? "Trip details" : "Choose a ride"}
+          {activeTrip ? t("trip.details") : t("trip.choose")}
         </button>
       )}
 
@@ -159,25 +162,25 @@ export default function RidePage() {
             <button
               onClick={() => setSheetOpen(false)}
               className="w-9 h-1 rounded-full bg-line"
-              aria-label="Collapse"
+              aria-label={t("trip.collapse")}
             />
           </div>
           <div className="px-5 pb-7">
             {activeTrip ? (
               <div className="space-y-3">
                 <p className="text-2xl font-bold text-center pt-1">
-                  {STATUS_COPY[activeTrip.status] ?? activeTrip.status}
+                  {STATUS_COPY[activeTrip.status] ? t(STATUS_COPY[activeTrip.status]) : activeTrip.status}
                 </p>
 
                 {activeTrip.status === "requested" && (
                   <p className="text-sm text-center text-muted">
-                    Contacting nearby drivers
+                    {t("trip.contacting")}
                     {activeTrip.offerRound ? ` (${activeTrip.offerRound})` : ""}
                   </p>
                 )}
                 {activeTrip.status === "accepted" && activeTrip.etaToPickupMin != null && (
                   <p className="text-base text-center text-muted">
-                    {activeTrip.arrivedAt ? "Your driver has arrived" : `About ${activeTrip.etaToPickupMin} min away`}
+                    {activeTrip.arrivedAt ? t("trip.arrived") : t("trip.eta", { min: activeTrip.etaToPickupMin })}
                   </p>
                 )}
 
@@ -187,23 +190,23 @@ export default function RidePage() {
                 </div>
                 {activeTrip.fare && activeTrip.fare.surgeMultiplier > 1 && (
                   <p className="text-sm text-center text-muted">
-                    Includes {activeTrip.fare.surgeMultiplier}&times; busy-period pricing
+                    {t("trip.surge", { x: activeTrip.fare.surgeMultiplier })}
                   </p>
                 )}
                 {activeTrip.promisedBy && activeTrip.serviceClass !== "express" && (
                   <p className="text-sm text-center text-muted">
-                    Promised by {new Date(activeTrip.promisedBy).toLocaleDateString()}
+                    {t("trip.promised", { date: new Date(activeTrip.promisedBy).toLocaleDateString(locale) })}
                   </p>
                 )}
 
                 {activeTrip.deliveryCode && activeTrip.status !== "requested" && (
                   <div className="rounded-lg bg-surface p-4 text-center">
-                    <p className="eyebrow">Delivery code</p>
+                    <p className="eyebrow">{t("trip.code")}</p>
                     <p className="text-4xl font-bold tracking-[0.35em] mt-1.5 ml-[0.35em]">{activeTrip.deliveryCode}</p>
                     <p className="text-sm text-muted mt-1.5">
                       {activeTrip.deliveryConfirmedAt
-                        ? "Confirmed by the driver."
-                        : "Give this to the driver only when the goods arrive."}
+                        ? t("trip.confirmed")
+                        : t("trip.give_code")}
                     </p>
                   </div>
                 )}
@@ -214,7 +217,7 @@ export default function RidePage() {
                     disabled={cancelling}
                     className="btn-danger"
                   >
-                    {cancelling ? "Cancelling..." : "Cancel trip"}
+                    {cancelling ? t("trip.cancelling") : t("trip.cancel")}
                   </button>
                 )}
 
@@ -229,7 +232,7 @@ export default function RidePage() {
 
                 {activeTrip.paymentStatus === "cash" && (
                   <p className="text-center text-base font-medium">
-                    Paid in cash.
+                    {t("trip.paid_cash")}
                   </p>
                 )}
               </div>

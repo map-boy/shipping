@@ -5,6 +5,7 @@ import { services } from "../lib/services";
 import { useCart } from "../context/cart";
 import { useLang } from "../i18n/context";
 import LanguageSwitcher from "./LanguageSwitcher";
+import type { MsgKey } from "../i18n/messages";
 
 interface NavbarProps {
   user: User | null;
@@ -86,7 +87,7 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
                 aria-haspopup="true"
                 className={`flex items-center gap-1 hover:text-white/70 transition-colors rounded ${focusRing} focus-visible:ring-offset-black`}
               >
-                Services
+                {t("nav.services")}
                 <svg className={`w-2.5 h-2.5 transform transition-transform ${servicesOpen ? "rotate-180" : ""}`} viewBox="0 0 10 6" fill="none">
                   <path d="m1 1 4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -101,7 +102,7 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
                           onClick={() => setServicesOpen(false)}
                           className={`block px-4 py-1 whitespace-nowrap hover:bg-gray-100 hover:text-white/70 rounded-lg transition-colors ${focusRing} focus-visible:ring-offset-white`}
                         >
-                          {s.name}
+                          {t(`svc.${s.slug}.name` as MsgKey)}
                         </Link>
                       </li>
                     ))}
@@ -111,24 +112,24 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
             </div>
 
             <Link to="/book" className={`relative pb-1 transition-colors hover:text-white/70 rounded ${focusRing} focus-visible:ring-offset-black ${isActive("/book") ? "text-white after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-white after:rounded-full" : ""}`}>
-              Book or Order
+              {t("nav.book_order")}
             </Link>
             <Link to="/ride" className={`relative pb-1 transition-colors hover:text-white/70 rounded ${focusRing} focus-visible:ring-offset-black ${isActive("/ride") ? "text-white after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-white after:rounded-full" : ""}`}>
-              Book a Ride
+              {t("nav.book_ride")}
             </Link>
             <Link to="/truck" className={`relative pb-1 transition-colors hover:text-white/70 rounded ${focusRing} focus-visible:ring-offset-black ${isActive("/truck") ? "text-white after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-white after:rounded-full" : ""}`}>
-              Book a Truck
+              {t("nav.book_truck")}
             </Link>
             <Link to="/driver" className={`relative pb-1 transition-colors hover:text-white/70 rounded ${focusRing} focus-visible:ring-offset-black ${isActive("/driver") ? "text-white after:absolute after:left-0 after:right-0 after:-bottom-1 after:h-0.5 after:bg-white after:rounded-full" : ""}`}>
-              Drive with TikTak
+              {t("nav.drive")}
             </Link>
-            <a href="/#how" className={`hover:text-white/70 transition-colors rounded ${focusRing} focus-visible:ring-offset-black`}>How It Works</a>
+            <a href="/#how" className={`hover:text-white/70 transition-colors rounded ${focusRing} focus-visible:ring-offset-black`}>{t("nav.how")}</a>
           </nav>
 
           <div className="flex items-center gap-3">
             <Link
               to="/cart"
-              aria-label="Cart"
+              aria-label={t("nav.cart")}
               className={`relative flex items-center justify-center min-w-[44px] min-h-[44px] text-slate-100 hover:text-white/70 transition-colors rounded ${focusRing} focus-visible:ring-offset-black`}
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -149,7 +150,7 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                   </svg>
-                  Profile
+                  {t("nav.profile")}
                 </Link>
               </>
             ) : (
@@ -157,20 +158,20 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
                 onClick={onLoginClick}
                 className={`hidden sm:inline text-sm text-slate-100 hover:text-white/70 transition-colors rounded ${focusRing} focus-visible:ring-offset-black`}
               >
-                Log in
+                {t("nav.login")}
               </button>
             )}
             <Link
               to="/book"
               className={`bg-white text-ink text-sm font-semibold px-5 py-2.5 rounded-full transition min-h-[44px] flex items-center active:bg-line ${focusRing} focus-visible:ring-offset-black`}
             >
-              Book
+              {t("nav.book")}
             </Link>
             <button
               ref={hamburgerRef}
               className={`lg:hidden text-white min-w-[44px] min-h-[44px] flex items-center justify-center rounded ${focusRing} focus-visible:ring-offset-black`}
               onClick={() => setMobileOpen((v) => !v)}
-              aria-label="Toggle menu"
+              aria-label={t("nav.toggle")}
               aria-expanded={mobileOpen}
             >
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -184,22 +185,22 @@ export default function Navbar({ user, onLoginClick }: NavbarProps) {
           <div ref={mobileMenuRef} className="lg:hidden fixed top-16 left-0 w-full h-screen bg-white shadow-lg z-50 px-4 py-4 animate-fadeInUp">
             <ul className="text-gray-700 space-y-3 text-base">
               {user ? (
-                <li><Link to="/profile" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/profile") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Profile</Link></li>
+                <li><Link to="/profile" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/profile") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>{t("nav.profile")}</Link></li>
               ) : (
-                <li><button onClick={onLoginClick} className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white`}>Log in</button></li>
+                <li><button onClick={onLoginClick} className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white`}>{t("nav.login")}</button></li>
               )}
               <li>
                 <Link to="/cart" className={`flex items-center gap-2 hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/cart") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>
-                  Cart{itemCount > 0 ? ` (${itemCount})` : ""}
+                  {t("nav.cart")}{itemCount > 0 ? ` (${itemCount})` : ""}
                 </Link>
               </li>
-              <li><Link to="/book" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/book") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Book or Order</Link></li>
-              <li><Link to="/ride" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/ride") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Book a Ride</Link></li>
-              <li><Link to="/truck" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/truck") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Book a Truck</Link></li>
-              <li><Link to="/driver" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/driver") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>Drive with TikTak</Link></li>
-              <li><a href="/#how" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white`}>How It Works</a></li>
+              <li><Link to="/book" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/book") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>{t("nav.book_order")}</Link></li>
+              <li><Link to="/ride" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/ride") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>{t("nav.book_ride")}</Link></li>
+              <li><Link to="/truck" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/truck") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>{t("nav.book_truck")}</Link></li>
+              <li><Link to="/driver" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white ${isActive("/driver") ? "text-cta font-semibold" : ""}`} onClick={() => setMobileOpen(false)}>{t("nav.drive")}</Link></li>
+              <li><a href="/#how" className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white`}>{t("nav.how")}</a></li>
               {services.map((s) => (
-                <li key={s.slug}><Link to={`/services/${s.slug}`} className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white`} onClick={() => setMobileOpen(false)}>{s.name}</Link></li>
+                <li key={s.slug}><Link to={`/services/${s.slug}`} className={`block hover:text-white/70 py-2 rounded ${focusRing} focus-visible:ring-offset-white`} onClick={() => setMobileOpen(false)}>{t(`svc.${s.slug}.name` as MsgKey)}</Link></li>
               ))}
             </ul>
           </div>

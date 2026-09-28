@@ -15,6 +15,8 @@ import { loadGoogleMaps } from "../lib/googleMapsLoader";
 import { useToast } from "../context/toast";
 import { describeCallableError, backendReachable } from "../lib/callableError";
 import { ensureUser, GuestSignInError } from "../lib/ensureUser";
+import { useLang } from "../i18n/context";
+import type { MsgKey } from "../i18n/messages";
 
 type Step = 1 | 2 | 3;
 
@@ -36,6 +38,7 @@ function isValidRwandaPhone(raw: string): boolean {
 export default function BookOrder() {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { t } = useLang();
 
   const [step, setStep] = useState<Step>(1);
 
@@ -142,7 +145,7 @@ export default function BookOrder() {
         setQuote({
           ...truck,
           formula: truck.formula,
-          label: VEHICLE_LABELS.truck,
+          label: t("vehicle.truck"),
           maxLoadKg: 30000,
           serviceClass: "express",
           handling: "ambient",
@@ -166,7 +169,7 @@ export default function BookOrder() {
 
       const match = result.quotes.find((q) => q.vehicleType === vehicleType);
       if (!match) {
-        setQuoteError(`${VEHICLE_LABELS[vehicleType]} cannot serve this booking.`);
+        setQuoteError(t("book.cannot_serve", { vehicle: t(`vehicle.${vehicleType}` as MsgKey) }));
         setQuote(null);
         return;
       }
@@ -183,7 +186,7 @@ export default function BookOrder() {
     } finally {
       setQuoting(false);
     }
-  }, [pickup, dropoff, tripType, vehicleType, truckPackage, tonnesNum, toursNum, byTours]);
+  }, [pickup, dropoff, tripType, vehicleType, truckPackage, tonnesNum, toursNum, byTours, t]);
 
   const availableVehicles = useMemo(
     () => VEHICLE_ORDER.filter((v) => VEHICLE_LABELS[v]),
@@ -221,10 +224,10 @@ export default function BookOrder() {
       // Only a real trip id means the server actually wrote the order. Anything
       // else is treated as a failure rather than announced as success.
       if (!tripId) {
-        throw new Error("The order was not confirmed by the server.");
+        throw new Error(t("book.not_confirmed"));
       }
 
-      showToast("Order placed. Finding a driver...", "success");
+      showToast(t("book.placed"), "success");
       navigate("/ride", { state: { tripId } });
       return;
     } catch (err) {
@@ -243,8 +246,8 @@ export default function BookOrder() {
   if (picking) {
     return (
       <DestinationPicker
-        title={picking === "pickup" ? "Set the pickup point" : "Set the drop-off point"}
-        confirmLabel={picking === "pickup" ? "Confirm pickup" : "Confirm drop-off"}
+        title={picking === "pickup" ? t("book.set_pickup") : t("book.set_dropoff")}
+        confirmLabel={picking === "pickup" ? t("book.confirm_pickup") : t("book.confirm_dropoff")}
         initialCenter={
           picking === "pickup"
             ? pickup
@@ -268,7 +271,7 @@ export default function BookOrder() {
 
   return (
     <div className="max-w-xl mx-auto px-4 py-8 pb-16">
-      <h1 className="text-3xl font-bold">Book or order</h1>
+      <h1 className="text-3xl font-bold">{t("book.title")}</h1>
 
       {/* Step rail */}
       <ol className="flex items-center gap-2 mt-5 mb-7">
@@ -289,11 +292,11 @@ export default function BookOrder() {
       {step === 1 && (
         <div className="space-y-5">
           <div>
-            <p className="eyebrow mb-2">Your details</p>
+            <p className="eyebrow mb-2">{t("book.details")}</p>
             <input
               type="text"
               autoComplete="name"
-              placeholder="Full name"
+              placeholder={t("book.name")}
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               className="field"
@@ -302,20 +305,20 @@ export default function BookOrder() {
               type="tel"
               inputMode="tel"
               autoComplete="tel"
-              placeholder="Phone number, e.g. 0781234567"
+              placeholder={t("book.phone")}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               className="field mt-3"
             />
             {phone.length > 0 && !isValidRwandaPhone(phone) && (
               <p className="text-sm text-red-600 mt-1.5">
-                Enter a Rwandan mobile number, e.g. 0781234567.
+                {t("book.phone_err")}
               </p>
             )}
           </div>
 
           <label className="block">
-            <span className="eyebrow">Vehicle</span>
+            <span className="eyebrow">{t("book.vehicle")}</span>
             <select
               value={vehicleType}
               onChange={(e) => setVehicleType(e.target.value as VehicleType)}
@@ -323,7 +326,7 @@ export default function BookOrder() {
             >
               {availableVehicles.map((v) => (
                 <option key={v} value={v}>
-                  {VEHICLE_LABELS[v]}
+                  {t(`vehicle.${v}` as MsgKey)}
                 </option>
               ))}
             </select>
@@ -331,7 +334,7 @@ export default function BookOrder() {
 
           {isTruck && (
             <div className="space-y-3 rounded-lg bg-surface p-4">
-              <p className="eyebrow">How is the load measured?</p>
+              <p className="eyebrow">{t("book.measure")}</p>
               <div className="flex gap-2">
                 {(["tonnes", "tours"] as TruckPackage[]).map((mode) => (
                   <button
@@ -343,18 +346,18 @@ export default function BookOrder() {
                         : "border-transparent bg-white/60 text-muted"
                     }`}
                   >
-                    {mode === "tonnes" ? "In tonnes" : "In tours"}
+                    {mode === "tonnes" ? t("book.tonnes") : t("book.tours")}
                   </button>
                 ))}
               </div>
               <p className="text-sm text-muted">
                 {byTours
-                  ? "Priced per truckload and distance. Your exact price is shown before you confirm."
-                  : "Priced by weight and distance. Your exact price is shown before you confirm."}
+                  ? t("book.priced_tours")
+                  : t("book.priced_tonnes")}
               </p>
 
               <label className="block">
-                <span className="eyebrow">{byTours ? "Number of tours" : "Weight in tonnes"}</span>
+                <span className="eyebrow">{byTours ? t("book.n_tours") : t("book.weight")}</span>
                 <input
                   type="number"
                   inputMode={byTours ? "numeric" : "decimal"}
@@ -368,8 +371,8 @@ export default function BookOrder() {
                 {!truckDetailsValid && (
                   <span className="block text-sm text-red-600 mt-1.5">
                     {byTours
-                      ? "Enter a whole number of tours from 1 to 100."
-                      : "Enter a weight between 0.1 and 30 tonnes."}
+                      ? t("book.tours_err")
+                      : t("book.tonnes_err")}
                   </span>
                 )}
               </label>
@@ -377,14 +380,14 @@ export default function BookOrder() {
           )}
 
           <button onClick={() => setStep(2)} disabled={!step1Valid} className="btn-primary">
-            Continue
+            {t("book.continue")}
           </button>
         </div>
       )}
 
       {step === 2 && (
         <div className="space-y-5">
-          <p className="eyebrow">Where from, and where to</p>
+          <p className="eyebrow">{t("book.where")}</p>
 
           <button
             onClick={() => setPicking("pickup")}
@@ -392,9 +395,9 @@ export default function BookOrder() {
           >
             <span className="w-2.5 h-2.5 rounded-full bg-ink shrink-0" />
             <span className="min-w-0">
-              <span className="block eyebrow">Pickup</span>
+              <span className="block eyebrow">{t("book.pickup")}</span>
               <span className={`block truncate ${pickup ? "text-ink font-medium" : "text-muted"}`}>
-                {pickup ? pickup.name : "Choose on the map"}
+                {pickup ? pickup.name : t("book.choose_map")}
               </span>
             </span>
           </button>
@@ -405,16 +408,16 @@ export default function BookOrder() {
           >
             <span className="w-2.5 h-2.5 rounded-[2px] bg-ink shrink-0" />
             <span className="min-w-0">
-              <span className="block eyebrow">Drop-off</span>
+              <span className="block eyebrow">{t("book.dropoff")}</span>
               <span className={`block truncate ${dropoff ? "text-ink font-medium" : "text-muted"}`}>
-                {dropoff ? dropoff.name : "Choose on the map"}
+                {dropoff ? dropoff.name : t("book.choose_map")}
               </span>
             </span>
           </button>
 
           {pickup && dropoff && !samePlace && (
             <div>
-              <p className="eyebrow mb-2">Check the route</p>
+              <p className="eyebrow mb-2">{t("book.check_route")}</p>
               <RoutePreviewMap
                 pickup={pickup}
                 dropoff={dropoff}
@@ -425,13 +428,13 @@ export default function BookOrder() {
 
           {samePlace && (
             <p className="text-sm text-red-600">
-              Pickup and drop-off are the same place. Set a different drop-off point.
+              {t("book.same_place")}
             </p>
           )}
 
           <div className="flex gap-3">
             <button onClick={() => setStep(1)} className="btn-secondary flex-1">
-              Back
+              {t("book.back")}
             </button>
             <button
               onClick={() => {
@@ -441,7 +444,7 @@ export default function BookOrder() {
               disabled={!step2Valid}
               className="btn-primary flex-1"
             >
-              Calculate price
+              {t("book.calc")}
             </button>
           </div>
         </div>
@@ -449,24 +452,21 @@ export default function BookOrder() {
 
       {step === 3 && (
         <div className="space-y-5">
-          <p className="eyebrow">Your price</p>
+          <p className="eyebrow">{t("book.your_price")}</p>
 
           {pickup && dropoff && (
             <RoutePreviewMap pickup={pickup} dropoff={dropoff} onRoute={(r) => setRoute(r)} />
           )}
 
-          {quoting && <p className="text-muted">Calculating from the map...</p>}
+          {quoting && <p className="text-muted">{t("book.calculating")}</p>}
           {quoteError && (
             <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4 space-y-2">
               <p className="text-sm font-semibold text-red-700">{quoteError}</p>
               {backendDown && (
-                <p className="text-sm text-red-700">
-                  The booking backend is not reachable at all, so this is not a problem with
-                  your details. Deploy the Cloud Functions and try again.
-                </p>
+                <p className="text-sm text-red-700">{t("book.backend_down")}</p>
               )}
               {quoteErrorCode && (
-                <p className="text-xs text-red-600 font-mono">error code: {quoteErrorCode}</p>
+                <p className="text-xs text-red-600 font-mono">{t("book.error_code", { code: quoteErrorCode })}</p>
               )}
             </div>
           )}
@@ -475,29 +475,22 @@ export default function BookOrder() {
             <>
               <div className="border-y border-line py-4">
                 <div className="flex items-baseline justify-between">
-                  <span className="text-lg font-semibold">{VEHICLE_LABELS[vehicleType]}</span>
+                  <span className="text-lg font-semibold">{t(`vehicle.${vehicleType}` as MsgKey)}</span>
                   <span className="text-3xl font-bold">{formatRwf(quote.price)}</span>
                 </div>
                                 <p className="text-sm text-muted mt-1">
                   {quote.roundTrip
-                    ? `${quote.seats} seats Â· ${quote.billableKm} km return`
-                    : `${quote.distanceKm} km${route ? ` Â· about ${route.min} min` : ""}`}
+                    ? t("book.seats_return", { seats: quote.seats ?? "", km: quote.billableKm ?? "" })
+                    : route ? t("book.km_about", { km: quote.distanceKm, min: route.min }) : t("book.km", { km: quote.distanceKm })}
                 </p>
               </div>
 
               {/* The client asked for this warning explicitly: the fare covers the
                   drop-off as declared, and going past it is chargeable. */}
               <div className="rounded-lg border-2 border-ink p-4 space-y-2">
-                <p className="text-sm font-semibold">Please note</p>
-                <p className="text-sm">
-                  This price covers the drop-off point you set above, a distance of{" "}
-                  <span className="font-semibold">{quote.distanceKm} km</span>. If the goods
-                  actually have to go beyond that point, the extra distance is charged separately.
-                </p>
-                <p className="text-sm text-muted">
-                  Iyi price ni ya aho ushyize umuzigo ugera. Nibiba ngombwa ko urenga aho,
-                  urugendo rwiyongereye ruzishyurwa ukwarwo.
-                </p>
+                <p className="text-sm font-semibold">{t("book.note_title")}</p>
+                <p className="text-sm">{t("book.note_a")}{" "}<span className="font-semibold">{quote.distanceKm} km</span>. {t("book.note_b")}</p>
+                {t("book.note_local") && <p className="text-sm text-muted">{t("book.note_local")}</p>}
                 <label className="flex items-start gap-2.5 pt-1 cursor-pointer">
                   <input
                     type="checkbox"
@@ -505,7 +498,7 @@ export default function BookOrder() {
                     onChange={(e) => setAcceptedExtra(e.target.checked)}
                     className="w-4 h-4 mt-0.5 shrink-0"
                   />
-                  <span className="text-sm font-medium">I understand and accept this.</span>
+                  <span className="text-sm font-medium">{t("book.accept")}</span>
                 </label>
               </div>
             </>
@@ -519,17 +512,17 @@ export default function BookOrder() {
 
           {quote && !acceptedExtra && (
             <p className="text-sm text-muted">
-              Tick the box above to confirm you understand the drop-off distance before ordering.
+              {t("book.tick")}
             </p>
           )}
 
           <div className="flex gap-3">
             <button onClick={() => setStep(2)} disabled={submitting} className="btn-secondary flex-1">
-              Back
+              {t("book.back")}
             </button>
             {quoteError && !quote ? (
               <button onClick={() => void runQuote()} className="btn-primary flex-1">
-                Try again
+                {t("book.try_again")}
               </button>
             ) : (
               <button
@@ -540,13 +533,13 @@ export default function BookOrder() {
                 {submitting && (
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {submitting ? "Placing your order..." : "Place order"}
+                {submitting ? t("book.placing") : t("book.place")}
               </button>
             )}
           </div>
 
           <p className="text-sm text-muted text-center">
-            No account needed. Keep this page open to follow your driver on the map.
+            {t("book.no_account")}
           </p>
         </div>
       )}

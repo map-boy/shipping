@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { LangContext, type LangContextValue } from "./context";
 import { LANGS, LOCALE, dictionaries, type Lang } from "./messages";
+import { active } from "./active";
 
 const STORAGE_KEY = "tiktak.lang";
 
@@ -20,6 +21,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.lang = lang;
+    active.lang = lang;
   }, [lang]);
 
   const setLang = useCallback((next: Lang) => {

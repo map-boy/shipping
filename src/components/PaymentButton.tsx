@@ -3,6 +3,7 @@ import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
 import { useToast } from "../context/toast";
 import type { PaymentStatus } from "../lib/trips";
+import { useLang } from "../i18n/context";
 
 interface Props {
   tripId: string;
@@ -23,6 +24,7 @@ function normalizePhone(raw: string): string {
 
 export default function PaymentButton({ tripId, amount, paymentStatus, paymentProvider }: Props) {
   const { showToast } = useToast();
+  const { t } = useLang();
   const [method, setMethod] = useState<Method>("mobile");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [requested, setRequested] = useState(false);
@@ -64,19 +66,19 @@ export default function PaymentButton({ tripId, amount, paymentStatus, paymentPr
 
     if (paymentStatus !== prevStatusRef.current) {
       if (paymentStatus === "successful") {
-        showToast("Payment received. Thank you!", "success");
+        showToast(t("pay.received"), "success");
       } else if (paymentStatus === "failed") {
-        showToast("Payment failed. Please try again.", "error");
+        showToast(t("pay.failed"), "error");
       }
       prevStatusRef.current = paymentStatus;
     }
-  }, [paymentStatus, paymentProvider, showToast, startPolling, stopPolling]);
+  }, [paymentStatus, paymentProvider, showToast, startPolling, stopPolling, t]);
 
   async function handleMobilePay() {
     setError(null);
     if (!phoneNumber.trim()) {
-      setError("Enter your Mobile Money phone number.");
-      showToast("Enter your Mobile Money phone number.", "error");
+      setError(t("pay.enter_phone"));
+      showToast(t("pay.enter_phone"), "error");
       return;
     }
     setRequested(true);
@@ -86,9 +88,9 @@ export default function PaymentButton({ tripId, amount, paymentStatus, paymentPr
         "requestIntouchPayment"
       );
       await request({ phoneNumber: normalizePhone(phoneNumber), tripId });
-      showToast("Payment request sent. Check your phone to confirm.", "info");
+      showToast(t("pay.sent"), "info");
     } catch (err) {
-      const message = err instanceof Error && err.message ? err.message : "Payment request failed.";
+      const message = err instanceof Error && err.message ? err.message : t("pay.req_fail");
       setError(message);
       showToast(message, "error");
       setRequested(false);
@@ -103,7 +105,7 @@ export default function PaymentButton({ tripId, amount, paymentStatus, paymentPr
       const res = await create({ tripId });
       window.location.assign(res.data.payUrl);
     } catch (err) {
-      const message = err instanceof Error && err.message ? err.message : "Card payment could not be started.";
+      const message = err instanceof Error && err.message ? err.message : t("pay.card_fail");
       setError(message);
       showToast(message, "error");
       setRequested(false);
@@ -111,14 +113,14 @@ export default function PaymentButton({ tripId, amount, paymentStatus, paymentPr
   }
 
   if (paymentStatus === "successful") {
-    return <p className="text-center text-base font-semibold">Payment received. Thank you.</p>;
+    return <p className="text-center text-base font-semibold">{t("pay.received")}</p>;
   }
 
   const isPending = paymentStatus === "pending" || (requested && paymentStatus !== "failed");
 
   return (
     <div className="space-y-3">
-      <p className="eyebrow">Pay now</p>
+      <p className="eyebrow">{t("pay.title")}</p>
       <div className="flex gap-2">
         {(["mobile", "card"] as Method[]).map((m) => (
           <button
@@ -130,7 +132,7 @@ export default function PaymentButton({ tripId, amount, paymentStatus, paymentPr
               method === m ? "border-ink bg-white text-ink" : "border-transparent bg-white/60 text-muted"
             }`}
           >
-            {m === "mobile" ? "MTN / Airtel Money" : "Card"}
+            {m === "mobile" ? t("pay.mobile") : t("pay.card")}
           </button>
         ))}
       </div>
@@ -139,8 +141,8 @@ export default function PaymentButton({ tripId, amount, paymentStatus, paymentPr
         <input
           type="tel"
           inputMode="tel"
-          placeholder="e.g. 0781234567"
-          aria-label="Mobile Money phone number"
+          placeholder={t("pay.phone_ph")}
+          aria-label={t("pay.phone_aria")}
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(e.target.value)}
           className="field"
@@ -148,18 +150,16 @@ export default function PaymentButton({ tripId, amount, paymentStatus, paymentPr
         />
       )}
       {method === "card" && (
-        <p className="text-sm text-muted">
-          You will be taken to a secure page to pay by Visa or Mastercard, then brought back here.
-        </p>
+        <p className="text-sm text-muted">{t("pay.card_info")}</p>
       )}
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {paymentStatus === "failed" && (
-        <p className="text-red-600 text-sm">Payment failed. Please try again.</p>
+        <p className="text-red-600 text-sm">{t("pay.failed")}</p>
       )}
       {isPending && (
         <p className="text-sm text-muted">
-          {paymentProvider === "dpo" ? "Waiting for your card payment to confirm." : "Check your phone to approve."}
+          {paymentProvider === "dpo" ? t("pay.wait_card") : t("pay.check_phone")}
         </p>
       )}
       <button
@@ -170,7 +170,7 @@ export default function PaymentButton({ tripId, amount, paymentStatus, paymentPr
         {isPending && (
           <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
         )}
-        {isPending ? "Waiting..." : `Pay ${amount.toLocaleString()} RWF`}
+        {isPending ? t("pay.waiting") : t("pay.pay", { amount: amount.toLocaleString() })}
       </button>
     </div>
   );
