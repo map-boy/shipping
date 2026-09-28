@@ -23,11 +23,6 @@ export default function ServiceOffers() {
               <h3 className="text-xl font-bold">{offer.name}</h3>
               <p className="text-muted mt-1.5">{offer.summary}</p>
 
-              <div className="mt-3 rounded-lg bg-surface px-4 py-3">
-                <p className="eyebrow">How it is priced</p>
-                <p className="text-sm font-medium mt-0.5">{offer.pricing}</p>
-              </div>
-
               <ul className="mt-3 space-y-1.5">
                 {offer.detail.map((line) => (
                   <li key={line} className="flex items-start gap-2.5 text-sm text-muted">
