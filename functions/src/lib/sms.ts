@@ -1,4 +1,4 @@
-﻿import axios from "axios";
+import axios from "axios";
 
 const AT_ENV = process.env.AT_ENV === "production" ? "production" : "sandbox";
 const AT_BASE_URL = AT_ENV === "production"
@@ -16,7 +16,7 @@ export async function sendSms(to: string | string[], message: string): Promise<v
     console.error("AT_API_KEY is not configured; skipping SMS.");
     return;
   }
-  const recipients = Array.isArray(to) ? to.join(",") : to;
+  const recipients = (Array.isArray(to) ? to : [to]).map((n) => n.trim()).filter(Boolean).map((n) => (n.startsWith("+") ? n : `+${n}`)).join(",");
   try {
     await axios.post(
       AT_BASE_URL,

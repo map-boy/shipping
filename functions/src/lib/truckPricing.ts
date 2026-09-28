@@ -71,14 +71,14 @@ export function calculateTruckPrice(input: {
 
     // if (0.25 x km x 1,000 x tonnes) < 250,000, price = 250,000; else price = the computed value
     const computed = TRUCK_RATE * distanceKm * TRUCK_TONNE_UNIT * tonnes;
-  const price = computed < TRUCK_BASE_PRICE_RWF ? TRUCK_BASE_PRICE_RWF : computed;
+  const price = Math.round(computed < TRUCK_BASE_PRICE_RWF ? TRUCK_BASE_PRICE_RWF : computed);
 
     return {
       price,
       formula:
         computed < TRUCK_BASE_PRICE_RWF
-          ? `${TRUCK_BASE_PRICE_RWF.toLocaleString()} (minimum) = ${price.toLocaleString()} RWF`
-          : `${TRUCK_RATE} x ${distanceKm} km x ${TRUCK_TONNE_UNIT.toLocaleString()} x ${tonnes} t = ${price.toLocaleString()} RWF`,
+          ? `Freight, ${distanceKm.toFixed(1)} km, ${tonnes} t`
+          : `Freight, ${distanceKm.toFixed(1)} km, ${tonnes} t`,
       pricingMethod,
       distanceKm,
       tonnes,
@@ -92,13 +92,13 @@ export function calculateTruckPrice(input: {
   }
 
   // 0.25 x km x tours x 30,000
-  const price = TRUCK_RATE * distanceKm * numberOfTours * TRUCK_TOUR_UNIT;
+  const price = Math.round(TRUCK_RATE * distanceKm * numberOfTours * TRUCK_TOUR_UNIT);
 
   return {
     price,
     formula:
-      `${TRUCK_RATE} x ${distanceKm} km x ${numberOfTours} tour${numberOfTours === 1 ? "" : "s"} x ` +
-      `${TRUCK_TOUR_UNIT.toLocaleString()} = ${price.toLocaleString()} RWF`,
+      `Freight, ${distanceKm.toFixed(1)} km, ${numberOfTours} tour${numberOfTours === 1 ? "" : "s"}` +
+      "",
     pricingMethod,
     distanceKm,
     tonnes: 0,

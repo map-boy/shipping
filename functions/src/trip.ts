@@ -1,4 +1,4 @@
-﻿import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { db } from "./lib/db";
 import {
   requireAuth, requireString, requireLatLng, normalizeRwandaMsisdn, requirePersonName,
@@ -231,10 +231,18 @@ export const createTrip = onCall(async (request) => {
     .map((s) => s.trim())
     .filter(Boolean);
   if (opsNumbers.length > 0) {
-    void sendSms(
+    await sendSms(
       opsNumbers,
       `New booking ${tripId}: ${vehicleType} ${tripType}, ` +
         `${fare.price} RWF. Confirm we can accommodate this.`
+    );
+  }
+
+  if (contactPhone) {
+    await sendSms(
+      contactPhone,
+      `TikTak: we have received your request (ref ${tripId.slice(-6).toUpperCase()}) and are on the case. ` +
+        `We will confirm shortly.`
     );
   }
 
