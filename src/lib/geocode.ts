@@ -1,5 +1,5 @@
 import { loadGoogleMaps } from "./googleMapsLoader";
-import { roadCodeQueries, roadCodeMatcher } from "./kigaliRoads";
+import { roadCodeQueries, roadCodeMatcher, roadCodeFallback } from "./kigaliRoads";
 
 export interface GeocodeResult {
   name: string;
@@ -148,5 +148,8 @@ export async function findPlaces(query: string): Promise<GeocodeResult[]> {
   } catch {
     // Places unavailable on this key - fall through to the geocoder.
   }
-  return await geocodeAddress(query);
+  const viaGeocoder = await geocodeAddress(query);
+  if (viaGeocoder.length > 0) return viaGeocoder;
+  const fallback = roadCodeFallback(query);
+  return fallback ? [fallback] : [];
 }

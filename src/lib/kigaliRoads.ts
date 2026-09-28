@@ -36,3 +36,22 @@ export function roadCodeMatcher(raw: string): RegExp | null {
   if (!m) return null;
   return new RegExp(`\\b${m[1]}\\s*${m[2]}\\b`, "i");
 }
+
+const DISTRICTS: Record<string, { name: string; lat: number; lng: number }> = {
+  KN: { name: "Nyarugenge", lat: -1.95, lng: 30.0588 },
+  KG: { name: "Gasabo", lat: -1.9355, lng: 30.1128 },
+  KK: { name: "Kicukiro", lat: -1.9706, lng: 30.1044 },
+};
+
+/** Last resort when Google finds nothing: open the map on the district so the pin can be dragged. */
+export function roadCodeFallback(raw: string): { name: string; lat: number; lng: number } | null {
+  const m = raw.trim().match(ROAD_CODE);
+  if (!m) return null;
+  const d = DISTRICTS[m[1].toUpperCase()];
+  if (!d) return null;
+  return {
+    name: `${m[1].toUpperCase()} ${m[2]} - ${d.name}, Kigali (drag the pin to the exact spot)`,
+    lat: d.lat,
+    lng: d.lng,
+  };
+}
