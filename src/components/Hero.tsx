@@ -1,10 +1,7 @@
-﻿import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import heroImg from "../assets/Kigali.jpg";
 
-const categories = [
-  "Passenger Ride", "Small Package", "Furniture & Boxes", "Market Goods",
-  "Office Delivery", "Airport Transfer", "Moving Home", "Other Goods",
-];
+
 
 export default function Hero() {
   return (
@@ -17,30 +14,27 @@ export default function Hero() {
             Made for Rwanda &middot; Kigali &amp; beyond
           </span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-white leading-tight">
-            Get a taxi <br /> <span className="text-cta">in minutes</span>
+            Move people. <br /> <span className="text-cta">Move freight.</span>
           </h1>
           <p className="mt-4 text-lg text-blue-200">
             Book a ride for yourself or send a package across Kigali &mdash; live tracking, fair fares, pay by Mobile Money or cash.
             <br />
             Trusted by riders and passengers across Rwanda.
           </p>
-          <div className="mt-6 bg-white rounded-2xl shadow-lg p-5 space-y-4 transition-transform hover:-translate-y-1 hover:shadow-2xl duration-300">
-            <select className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-700 h-[50px]" defaultValue="">
-              <option value="" disabled>What do you need moved?</option>
-              {categories.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-            <input
-              type="text"
-              placeholder="Pickup location in Kigali"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-700 h-[50px]"
-            />
+          <div className="mt-6 grid sm:grid-cols-2 gap-3">
             <Link
               to="/ride"
-              className="block w-full text-center bg-cta hover:bg-ctaHover text-white font-semibold py-3 rounded-lg transition transform hover:scale-[1.02]"
+              className="block bg-cta hover:bg-ctaHover text-white rounded-2xl p-5 shadow-lg transition transform hover:-translate-y-1"
             >
-              Book a Taxi Now
+              <span className="block text-lg font-bold">Book Executive Passenger Transport</span>
+              <span className="block text-sm text-white/80 mt-1">Rides, airport transfers and charters</span>
+            </Link>
+            <Link
+              to="/book"
+              className="block bg-white hover:bg-gray-50 text-gray-900 rounded-2xl p-5 shadow-lg transition transform hover:-translate-y-1"
+            >
+              <span className="block text-lg font-bold">Request Haulage &amp; Freight Quote</span>
+              <span className="block text-sm text-gray-600 mt-1">Trucks and heavy goods, priced up front</span>
             </Link>
           </div>
           <div className="mt-4 text-sm text-blue-200">
