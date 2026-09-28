@@ -1,6 +1,8 @@
 import Reveal from "./Reveal";
+import { useLang } from "../i18n/context";
 
 export default function ReviewBadges() {
+  const { t } = useLang();
   return (
     <section className="py-12">
       <div className="max-w-4xl mx-auto px-4 flex flex-col md:flex-row justify-between text-center gap-8">
@@ -10,8 +12,8 @@ export default function ReviewBadges() {
               <path d="M10 15.27L16.18 19l-1.64-7.03L20 7.24l-7.19-.61L10 0 7.19 6.63 0 7.24l5.46 4.73L3.82 19z" />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-gray-900">4.8/5 Rider Rating</h3>
-          <p className="text-gray-500 text-sm mt-1">from passengers across Kigali</p>
+          <h3 className="text-xl font-semibold text-gray-900">{t("badge.rating_title")}</h3>
+          <p className="text-gray-500 text-sm mt-1">{t("badge.rating_sub")}</p>
         </Reveal>
         <Reveal className="md:w-1/3" delayMs={120}>
           <div className="flex justify-center mb-3">
@@ -19,9 +21,7 @@ export default function ReviewBadges() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <p className="text-gray-600 text-sm">
-            Every rider is ID-verified before joining TikTak Rwanda
-          </p>
+          <p className="text-gray-600 text-sm">{t("badge.verified")}</p>
         </Reveal>
         <Reveal className="md:w-1/3" delayMs={240}>
           <div className="flex justify-center mb-3">
@@ -29,8 +29,8 @@ export default function ReviewBadges() {
               <path d="M10 15.27L16.18 19l-1.64-7.03L20 7.24l-7.19-.61L10 0 7.19 6.63 0 7.24l5.46 4.73L3.82 19z" />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-gray-900">4.6/5 Delivery Rating</h3>
-          <p className="text-gray-500 text-sm mt-1">for parcel &amp; goods delivery</p>
+          <h3 className="text-xl font-semibold text-gray-900">{t("badge.delivery_title")}</h3>
+          <p className="text-gray-500 text-sm mt-1">{t("badge.delivery_sub")}</p>
         </Reveal>
       </div>
     </section>

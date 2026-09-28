@@ -1,3 +1,5 @@
+import { homeEn, homeRw, homeSw } from "./home";
+
 export const LANGS = ["rw", "en", "sw"] as const;
 export type Lang = (typeof LANGS)[number];
 
@@ -10,6 +12,7 @@ export const LANG_LABEL: Record<Lang, string> = {
 export const LOCALE: Record<Lang, string> = { rw: "rw", en: "en", sw: "sw" };
 
 const en = {
+  ...homeEn,
   "lang.label": "Language",
 
   "nav.personal": "Personal Use",
@@ -45,6 +48,7 @@ export type MsgKey = keyof typeof en;
 type Dict = Record<MsgKey, string>;
 
 const rw: Dict = {
+  ...homeRw,
   "lang.label": "Ururimi",
 
   "nav.personal": "Gukoresha bwite",
@@ -77,6 +81,7 @@ const rw: Dict = {
 };
 
 const sw: Dict = {
+  ...homeSw,
   "lang.label": "Lugha",
 
   "nav.personal": "Matumizi Binafsi",
