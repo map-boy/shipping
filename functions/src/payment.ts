@@ -1,4 +1,4 @@
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import axios from "axios";
 import { randomUUID } from "crypto";
 import { db } from "./lib/db";
@@ -191,4 +191,123 @@ export const markCashPayment = onCall(async (request) => {
     }),
   });
   return { ok: true };
+});
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const IntouchApi = require("intouch-payments");
+
+function getIntouchClient() {
+  const username = process.env.INTOUCH_USERNAME;
+  const accountNo = process.env.INTOUCH_ACCOUNT_NO;
+  const partnerPassword = process.env.INTOUCH_PARTNER_PASSWORD;
+  const callbackUrl = process.env.INTOUCH_CALLBACK_URL;
+  if (!username || !accountNo || !partnerPassword) {
+    throw new HttpsError("failed-precondition", "IntouchPay is not configured on the server.");
+  }
+  return new IntouchApi(username, accountNo, partnerPassword, callbackUrl);
+}
+
+/** IntouchPay's status vocabulary is not publicly documented, so this matches
+ *  loosely on substrings rather than an exact expected value. */
+function normalizeIntouchStatus(raw: unknown): "pending" | "successful" | "failed" {
+  const value = String(raw ?? "").toLowerCase();
+  if (value.includes("success")) return "successful";
+  if (value.includes("fail") || value.includes("error") || value.includes("reject")) return "failed";
+  return "pending";
+}
+
+/** MTN or Airtel via IntouchPay - one call covers both; IntouchPay auto-detects
+ *  the network from the phone number's prefix. */
+export const requestIntouchPayment = onCall(async (request) => {
+  const uid = requireAuth(request);
+  const tripId = requireString(request.data?.tripId, "tripId");
+  const phoneNumber = normalizeRwandaMsisdn(request.data?.phoneNumber);
+
+  const trip = await getTrip(tripId);
+  if (trip.riderId !== uid) {
+    throw new HttpsError("permission-denied", "You do not own this trip.");
+  }
+  if (trip.status !== "accepted" && trip.status !== "in_progress") {
+    throw new HttpsError("failed-precondition", "Wait for a driver to accept before paying.");
+  }
+  if (trip.paymentStatus === "pending" || trip.paymentStatus === "successful" || trip.paymentStatus === "cash") {
+    throw new HttpsError("failed-precondition", "Payment already requested or completed for this trip.");
+  }
+
+  const amount = trip.price;
+  if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+    throw new HttpsError("failed-precondition", "Trip has no valid price set.");
+  }
+
+  const intouch = getIntouchClient();
+  try {
+    await intouch.requestPayment(amount, phoneNumber, tripId);
+  } catch (err) {
+    console.error("IntouchPay requestPayment error:", err);
+    throw new HttpsError("unavailable", "Payment request failed. You can pay the driver in cash instead.");
+  }
+
+  const now = Date.now();
+  await db.ref().update({
+    [`trips/${tripId}/paymentStatus`]: "pending",
+    [`trips/${tripId}/paymentProvider`]: "intouch",
+    [`trips/${tripId}/paymentAmount`]: amount,
+    [`trips/${tripId}/paymentCreatedAt`]: now,
+    ...tripEventUpdate(tripId, { type: "payment_requested", at: now, actorId: uid, data: { amount, provider: "intouch" } }),
+  });
+
+  // requestPayment's own response is not the final word - IntouchPay confirms
+  // completion asynchronously by posting to the callback URL below.
+  return { ok: true };
+});
+
+/**
+ * IntouchPay posts here when a payment settles. Field names are not publicly
+ * documented, so every plausible key is checked, and the raw body is logged
+ * so a mismatch is easy to spot and fix from the function logs.
+ */
+export const intouchPaymentCallback = onRequest(async (req, res) => {
+  const body = req.body ?? {};
+  const expectedToken = process.env.INTOUCH_CALLBACK_TOKEN;
+  if (!expectedToken || req.query.token !== expectedToken) {
+    console.error("IntouchPay callback rejected: missing or wrong token");
+    res.status(403).send("forbidden");
+    return;
+  }
+  const tripId =
+    body.transactionid || body.requesttransactionid || body.reference || body.referenceid || body.tripId;
+  const statusRaw = body.status || body.responsemessage || body.message;
+
+  if (!tripId || typeof tripId !== "string") {
+    console.error("IntouchPay callback missing a recognisable transaction id:", body);
+    res.status(400).send("missing transaction id");
+    return;
+  }
+
+  const snap = await db.ref(`trips/${tripId}`).get();
+  if (!snap.exists()) {
+    console.error("IntouchPay callback for unknown trip:", tripId, body);
+    res.status(404).send("unknown trip");
+    return;
+  }
+  const trip = snap.val();
+  const status = normalizeIntouchStatus(statusRaw);
+  if (trip.paymentProvider !== "intouch" || trip.paymentStatus !== "pending") {
+    res.status(200).send("ignored");
+    return;
+  }
+
+  const updates: Record<string, unknown> = { [`trips/${tripId}/paymentStatus`]: status };
+  if (status !== "pending") {
+    Object.assign(
+      updates,
+      tripEventUpdate(tripId, {
+        type: status === "successful" ? "payment_settled" : "payment_failed",
+        at: Date.now(),
+        data: { method: "intouch", amount: trip.paymentAmount ?? trip.price },
+      })
+    );
+  }
+  await db.ref().update(updates);
+  res.status(200).send("ok");
 });

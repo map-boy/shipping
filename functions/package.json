@@ -19,7 +19,8 @@
     "axios": "^1.18.1",
     "firebase-admin": "^13.6.0",
     "firebase-functions": "^6.4.0",
-    "geofire-common": "^6.0.0"
+    "geofire-common": "^6.0.0",
+    "intouch-payments": "^2.0.3"
   },
   "devDependencies": {
     "firebase-functions-test": "^3.4.1",

@@ -47,7 +47,7 @@ export { quoteFare, quoteTruckFare, quoteBusFare, getCatalog } from "./pricing";
 export { marketConditions } from "./marketplace";
 
 // Payments
-export { requestMomoPayment, checkMomoPaymentStatus, markCashPayment } from "./payment";
+export { requestMomoPayment, checkMomoPaymentStatus, markCashPayment, requestIntouchPayment, intouchPaymentCallback } from "./payment";
 
 // Trust: ratings and proof of delivery
 export { rateTrip, confirmDelivery } from "./trust";
@@ -82,4 +82,5 @@ export {
   adminSetDriverStatus,
   adminDispatchSweep,
 } from "./admin";
+
 
