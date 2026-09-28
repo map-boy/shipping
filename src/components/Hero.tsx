@@ -30,7 +30,7 @@ export default function Hero() {
               <span className="block text-sm text-white/80 mt-1">Rides, airport transfers and charters</span>
             </Link>
             <Link
-              to="/book"
+              to="/book?vehicle=truck"
               className="block bg-white hover:bg-gray-50 text-gray-900 rounded-2xl p-5 shadow-lg transition transform hover:-translate-y-1"
             >
               <span className="block text-lg font-bold">Request Haulage &amp; Freight Quote</span>

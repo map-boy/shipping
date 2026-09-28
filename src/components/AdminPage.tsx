@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from "react";
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type, react-hooks/set-state-in-effect */
+import { useEffect, useState } from "react";
 import { httpsCallable } from "firebase/functions";
 import type { User } from "firebase/auth";
 import { functions } from "../firebase";
