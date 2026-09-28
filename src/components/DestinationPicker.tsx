@@ -52,7 +52,7 @@ export default function DestinationPicker({
       })
       .catch(() => {
         if (seq !== requestSeq.current) return;
-        setAddress(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+        setAddress("Dropped pin on map");
       })
       .finally(() => {
         if (seq === requestSeq.current) setResolving(false);
@@ -127,7 +127,7 @@ export default function DestinationPicker({
         } else {
           // No map to pan, so adopt the fix directly as the chosen point.
           setCenter(here);
-          setAddress(`${here.lat.toFixed(5)}, ${here.lng.toFixed(5)}`);
+          setAddress("Your current location");
         }
       },
       (err) => {
@@ -151,7 +151,7 @@ export default function DestinationPicker({
 
   function confirm() {
     if (!center) return;
-    onConfirm({ name: address || `${center.lat.toFixed(5)}, ${center.lng.toFixed(5)}`, ...center });
+    onConfirm({ name: address || "Dropped pin on map", ...center });
   }
 
   return (
@@ -260,7 +260,7 @@ export default function DestinationPicker({
 
           {center && (
             <p className="text-sm text-muted text-center">
-              Selected: {center.lat.toFixed(5)}, {center.lng.toFixed(5)}
+              Selected: {resolving ? "Locating..." : address || "Dropped pin on map"}
             </p>
           )}
 

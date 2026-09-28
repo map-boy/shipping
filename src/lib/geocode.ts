@@ -1,5 +1,5 @@
-﻿import { loadGoogleMaps } from "./googleMapsLoader";
-import { isRoadCodeQuery, expandRoadCode } from "./kigaliRoads";
+import { loadGoogleMaps } from "./googleMapsLoader";
+import { roadCodeQueries, roadCodeMatcher } from "./kigaliRoads";
 
 export interface GeocodeResult {
   name: string;
@@ -17,7 +17,7 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
   return new Promise((resolve) => {
     geocoder.geocode({ location: { lat, lng } }, (results, status) => {
       if (status !== google.maps.GeocoderStatus.OK || !results || !results[0]) {
-        resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        resolve("Dropped pin on map");
         return;
       }
       resolve(results[0].formatted_address);
@@ -122,23 +122,31 @@ export async function geocodeAddress(query: string): Promise<GeocodeResult[]> {
   });
 }
 
-/** Places first, Geocoder as a fallback, so a typed name always has a chance. */
+/**
+ * Road codes ("kn18st", "KG 11 Ave") go to the Geocoder first, rewritten into the
+ * spaced form Google knows. Trying Places or a plain geocode first returned a
+ * loose match or nothing, so the old fallback never ran. Everything else: Places
+ * first, Geocoder as a fallback.
+ */
 export async function findPlaces(query: string): Promise<GeocodeResult[]> {
+  const matcher = roadCodeMatcher(query);
+  if (matcher) {
+    const batches = await Promise.all(
+      roadCodeQueries(query).map((q) => geocodeAddress(q).catch(() => [] as GeocodeResult[]))
+    );
+    const seen = new Set<string>();
+    const hits = batches.flat().filter((r) => {
+      if (!matcher.test(r.name) || seen.has(r.name)) return false;
+      seen.add(r.name);
+      return true;
+    });
+    if (hits.length > 0) return hits;
+  }
   try {
     const viaPlaces = await searchPlaces(query);
     if (viaPlaces.length > 0) return viaPlaces;
   } catch {
     // Places unavailable on this key - fall through to the geocoder.
   }
-  const direct = await geocodeAddress(query);
-  if (direct.length > 0) return direct;
-
-  if (isRoadCodeQuery(query)) {
-    const expanded = expandRoadCode(query);
-    if (expanded) return await geocodeAddress(expanded);
-  }
-  return [];
+  return await geocodeAddress(query);
 }
-
-
-
