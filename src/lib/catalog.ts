@@ -82,7 +82,7 @@ export const BUS_MINIMUM_EACH_WAY_KM = 50;
  *   by tonnes: 250,000 + (0.25 x km x 1,000 x tonnes)
  *   by tours:  0.25 x km x tours x 30,000
  */
-export const TRUCK_BASE_PRICE_RWF = 250_000;
-export const TRUCK_RATE = 0.25;
-export const TRUCK_TONNE_UNIT = 1_000;
-export const TRUCK_TOUR_UNIT = 30_000;
+
+
+
+

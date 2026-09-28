@@ -223,7 +223,7 @@ export default function RidePage() {
                     <PaymentButton
                       tripId={activeTrip.id}
                       amount={activeTrip.price}
-                      paymentStatus={activeTrip.paymentStatus}
+                      paymentStatus={activeTrip.paymentStatus} paymentProvider={(activeTrip as unknown as { paymentProvider?: string }).paymentProvider}
                     />
                   )}
 

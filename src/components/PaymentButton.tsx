@@ -8,7 +8,10 @@ interface Props {
   tripId: string;
   amount: number;
   paymentStatus?: PaymentStatus;
+  paymentProvider?: string;
 }
+
+type Method = "mobile" | "card";
 
 function normalizePhone(raw: string): string {
   const digits = raw.replace(/[^0-9]/g, "");
@@ -18,8 +21,9 @@ function normalizePhone(raw: string): string {
   return digits;
 }
 
-export default function PaymentButton({ tripId, amount, paymentStatus }: Props) {
+export default function PaymentButton({ tripId, amount, paymentStatus, paymentProvider }: Props) {
   const { showToast } = useToast();
+  const [method, setMethod] = useState<Method>("mobile");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [requested, setRequested] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,27 +37,27 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
     }
   }, []);
 
-  // The server reads the reference id off the trip itself, so the client never
-  // has to hold or replay it.
-  const startPolling = useCallback(() => {
-    if (pollRef.current) return;
-    const checkMomoPaymentStatus = httpsCallable<{ tripId: string }, { status: string }>(
-      functions,
-      "checkMomoPaymentStatus"
-    );
-    pollRef.current = setInterval(() => {
-      checkMomoPaymentStatus({ tripId }).catch(() => {
-        // transient network / MoMo hiccup - the next tick tries again
-      });
-    }, 4000);
-  }, [tripId]);
+  // IntouchPay settles through its server callback and the trip updates live, so
+  // only card (DPO) and the older MTN-direct flow need to be asked about.
+  const startPolling = useCallback(
+    (provider?: string) => {
+      if (provider === "intouch" || pollRef.current) return;
+      const name = provider === "dpo" ? "verifyDpoPayment" : "checkMomoPaymentStatus";
+      const check = httpsCallable<{ tripId: string }, { status: string }>(functions, name);
+      pollRef.current = setInterval(() => {
+        check({ tripId }).catch(() => {
+          // transient network hiccup - the next tick tries again
+        });
+      }, 4000);
+    },
+    [tripId]
+  );
 
   useEffect(() => stopPolling, [stopPolling]);
 
   useEffect(() => {
     if (paymentStatus === "pending") {
-      // Covers a reload in the middle of a payment as well as a fresh request.
-      startPolling();
+      startPolling(paymentProvider);
     } else if (paymentStatus === "successful" || paymentStatus === "failed") {
       stopPolling();
     }
@@ -66,9 +70,9 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
       }
       prevStatusRef.current = paymentStatus;
     }
-  }, [paymentStatus, showToast, startPolling, stopPolling]);
+  }, [paymentStatus, paymentProvider, showToast, startPolling, stopPolling]);
 
-  async function handlePay() {
+  async function handleMobilePay() {
     setError(null);
     if (!phoneNumber.trim()) {
       setError("Enter your Mobile Money phone number.");
@@ -76,17 +80,30 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
       return;
     }
     setRequested(true);
-
     try {
-      const requestMomoPayment = httpsCallable<{ phoneNumber: string; tripId: string }, { referenceId: string }>(
+      const request = httpsCallable<{ phoneNumber: string; tripId: string }, { ok: boolean }>(
         functions,
-        "requestMomoPayment"
+        "requestIntouchPayment"
       );
-      await requestMomoPayment({ phoneNumber: normalizePhone(phoneNumber), tripId });
+      await request({ phoneNumber: normalizePhone(phoneNumber), tripId });
       showToast("Payment request sent. Check your phone to confirm.", "info");
-      startPolling();
     } catch (err) {
       const message = err instanceof Error && err.message ? err.message : "Payment request failed.";
+      setError(message);
+      showToast(message, "error");
+      setRequested(false);
+    }
+  }
+
+  async function handleCardPay() {
+    setError(null);
+    setRequested(true);
+    try {
+      const create = httpsCallable<{ tripId: string }, { payUrl: string }>(functions, "createDpoPayment");
+      const res = await create({ tripId });
+      window.location.assign(res.data.payUrl);
+    } catch (err) {
+      const message = err instanceof Error && err.message ? err.message : "Card payment could not be started.";
       setError(message);
       showToast(message, "error");
       setRequested(false);
@@ -101,24 +118,52 @@ export default function PaymentButton({ tripId, amount, paymentStatus }: Props) 
 
   return (
     <div className="space-y-3">
-      <p className="eyebrow">Pay by Mobile Money</p>
-      <input
-        type="tel"
-        inputMode="tel"
-        placeholder="e.g. 0781234567"
-        aria-label="Mobile Money phone number"
-        value={phoneNumber}
-        onChange={(e) => setPhoneNumber(e.target.value)}
-        className="field"
-        disabled={isPending}
-      />
+      <p className="eyebrow">Pay now</p>
+      <div className="flex gap-2">
+        {(["mobile", "card"] as Method[]).map((m) => (
+          <button
+            key={m}
+            type="button"
+            disabled={isPending}
+            onClick={() => setMethod(m)}
+            className={`flex-1 px-3 py-3 rounded-lg text-sm font-semibold border-2 transition-colors ${
+              method === m ? "border-ink bg-white text-ink" : "border-transparent bg-white/60 text-muted"
+            }`}
+          >
+            {m === "mobile" ? "MTN / Airtel Money" : "Card"}
+          </button>
+        ))}
+      </div>
+
+      {method === "mobile" && (
+        <input
+          type="tel"
+          inputMode="tel"
+          placeholder="e.g. 0781234567"
+          aria-label="Mobile Money phone number"
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value)}
+          className="field"
+          disabled={isPending}
+        />
+      )}
+      {method === "card" && (
+        <p className="text-sm text-muted">
+          You will be taken to a secure page to pay by Visa or Mastercard, then brought back here.
+        </p>
+      )}
+
       {error && <p className="text-red-600 text-sm">{error}</p>}
       {paymentStatus === "failed" && (
         <p className="text-red-600 text-sm">Payment failed. Please try again.</p>
       )}
-      {isPending && <p className="text-sm text-muted">Check your phone to approve.</p>}
+      {isPending && (
+        <p className="text-sm text-muted">
+          {paymentProvider === "dpo" ? "Waiting for your card payment to confirm." : "Check your phone to approve."}
+        </p>
+      )}
       <button
-        onClick={handlePay}
+        onClick={method === "mobile" ? handleMobilePay : handleCardPay}
         disabled={isPending}
         className="btn-primary"
       >
