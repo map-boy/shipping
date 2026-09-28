@@ -1,4 +1,4 @@
-﻿import furnitureImg from "../assets/truck-loading.jpg";
+import furnitureImg from "../assets/truck-loading.jpg";
 import taxiImg from "../assets/track-driver.jpg";
 import carImg from "../assets/rental-cars.jpg";
 import vanImg from "../assets/truck-park.jpg";

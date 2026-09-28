@@ -1,4 +1,4 @@
-﻿import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
+import { onCall, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 
 /** Admin calls are rare, so they reserve almost no CPU. */
 const ADMIN_OPTS = { maxInstances: 1 } as const;
